@@ -33,7 +33,7 @@ type Account struct {
 }
 
 type Identifier struct {
-	Type  string `json:"type"`   // "nid" per NPS-RFC-0002 §4.4
+	Type  string `json:"type"` // "nid" per NPS-RFC-0002 §4.4
 	Value string `json:"value"`
 }
 
@@ -60,7 +60,7 @@ type Order struct {
 }
 
 type Challenge struct {
-	Type      string         `json:"type"`   // "agent-01" per NPS-RFC-0002 §4.4
+	Type      string         `json:"type"` // "agent-01" per NPS-RFC-0002 §4.4
 	URL       string         `json:"url"`
 	Status    string         `json:"status"`
 	Token     string         `json:"token"`

@@ -94,10 +94,14 @@ func VerifyWithPubKeyStr(payload core.FrameDict, pubKeyStr, signature string) bo
 
 // Save persists the identity to a file encrypted with AES-256-GCM + PBKDF2.
 func (id *NipIdentity) Save(path, passphrase string) error {
-	salt  := make([]byte, saltLen)
+	salt := make([]byte, saltLen)
 	nonce := make([]byte, nonceLen)
-	if _, err := io.ReadFull(rand.Reader, salt);  err != nil { return &core.ErrIdentity{Msg: err.Error()} }
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil { return &core.ErrIdentity{Msg: err.Error()} }
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return &core.ErrIdentity{Msg: err.Error()}
+	}
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return &core.ErrIdentity{Msg: err.Error()}
+	}
 
 	dk := pbkdf2.Key([]byte(passphrase), salt, pbkdf2Iters, keyLen, sha256.New)
 	block, err := aes.NewCipher(dk)
@@ -109,7 +113,7 @@ func (id *NipIdentity) Save(path, passphrase string) error {
 		return &core.ErrIdentity{Msg: err.Error()}
 	}
 
-	plaintext  := []byte(id.privKey) // ed25519.PrivateKey is []byte (seed + pub)
+	plaintext := []byte(id.privKey) // ed25519.PrivateKey is []byte (seed + pub)
 	ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
 
 	envelope := map[string]any{
@@ -138,22 +142,32 @@ func Load(path, passphrase string) (*NipIdentity, error) {
 		return nil, &core.ErrIdentity{Msg: err.Error()}
 	}
 
-	saltHex,  _ := envelope["salt"].(string)
+	saltHex, _ := envelope["salt"].(string)
 	nonceHex, _ := envelope["nonce"].(string)
-	ctHex,    _ := envelope["ciphertext"].(string)
+	ctHex, _ := envelope["ciphertext"].(string)
 
-	salt,  err := hex.DecodeString(saltHex)
-	if err != nil { return nil, &core.ErrIdentity{Msg: fmt.Sprintf("salt decode: %v", err)} }
+	salt, err := hex.DecodeString(saltHex)
+	if err != nil {
+		return nil, &core.ErrIdentity{Msg: fmt.Sprintf("salt decode: %v", err)}
+	}
 	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil { return nil, &core.ErrIdentity{Msg: fmt.Sprintf("nonce decode: %v", err)} }
-	ct,    err := hex.DecodeString(ctHex)
-	if err != nil { return nil, &core.ErrIdentity{Msg: fmt.Sprintf("ciphertext decode: %v", err)} }
+	if err != nil {
+		return nil, &core.ErrIdentity{Msg: fmt.Sprintf("nonce decode: %v", err)}
+	}
+	ct, err := hex.DecodeString(ctHex)
+	if err != nil {
+		return nil, &core.ErrIdentity{Msg: fmt.Sprintf("ciphertext decode: %v", err)}
+	}
 
 	dk := pbkdf2.Key([]byte(passphrase), salt, pbkdf2Iters, keyLen, sha256.New)
 	block, err := aes.NewCipher(dk)
-	if err != nil { return nil, &core.ErrIdentity{Msg: err.Error()} }
+	if err != nil {
+		return nil, &core.ErrIdentity{Msg: err.Error()}
+	}
 	gcm, err := cipher.NewGCM(block)
-	if err != nil { return nil, &core.ErrIdentity{Msg: err.Error()} }
+	if err != nil {
+		return nil, &core.ErrIdentity{Msg: err.Error()}
+	}
 
 	plaintext, err := gcm.Open(nil, nonce, ct, nil)
 	if err != nil {

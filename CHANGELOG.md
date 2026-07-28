@@ -8,6 +8,17 @@ Until NPS reaches v1.0 stable, every repository in the suite is synchronized to 
 
 ---
 
+## [1.0.0-alpha.17] — Unreleased
+
+### Added
+
+- Port the reference server surface into the Go SDK: NCP native transport, NWP action/complex/memory nodes and bidirectional bridges, NIP CA services and full verification, NOP orchestration, daemon observability, and telemetry.
+
+### Changed
+
+- Require Go 1.26.5 or newer so release builds include the current standard-library security fixes.
+- Apply canonical `gofmt` formatting across the SDK.
+
 ## [1.0.0-alpha.16] — 2026-07-23
 
 ### Changed

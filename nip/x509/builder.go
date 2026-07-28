@@ -76,18 +76,18 @@ func IssueLeaf(opts IssueLeafOptions) (*cryptox509.Certificate, error) {
 	}
 
 	tmpl := &cryptox509.Certificate{
-		SerialNumber: opts.SerialNumber,
-		Subject:      pkix.Name{CommonName: opts.SubjectNID},
-		Issuer:       pkix.Name{CommonName: opts.IssuerNID},
-		NotBefore:    opts.NotBefore,
-		NotAfter:     opts.NotAfter,
-		KeyUsage:     cryptox509.KeyUsageDigitalSignature,
+		SerialNumber:          opts.SerialNumber,
+		Subject:               pkix.Name{CommonName: opts.SubjectNID},
+		Issuer:                pkix.Name{CommonName: opts.IssuerNID},
+		NotBefore:             opts.NotBefore,
+		NotAfter:              opts.NotAfter,
+		KeyUsage:              cryptox509.KeyUsageDigitalSignature,
 		BasicConstraintsValid: true,
 		IsCA:                  false,
 		URIs:                  []*url.URL{uri},
 		ExtraExtensions: []pkix.Extension{
 			{Id: oidExtensionExtendedKeyUsage, Critical: true, Value: ekuValue},
-			{Id: OidNidAssuranceLevel,         Critical: false, Value: assuranceDer},
+			{Id: OidNidAssuranceLevel, Critical: false, Value: assuranceDer},
 		},
 	}
 

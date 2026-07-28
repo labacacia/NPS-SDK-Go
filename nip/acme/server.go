@@ -58,7 +58,7 @@ type Server struct {
 	baseURL string
 
 	nonces      map[string]struct{}
-	accountJwks map[string]*JWK            // accountUrl → jwk
+	accountJwks map[string]*JWK // accountUrl → jwk
 	orders      map[string]*orderState
 	authzs      map[string]*authzState
 	challenges  map[string]*challengeState
@@ -88,15 +88,15 @@ func (s *Server) Start() error {
 	s.baseURL = fmt.Sprintf("http://%s", ln.Addr().String())
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/directory",  s.handleDirectory)
-	mux.HandleFunc("/new-nonce",  s.handleNewNonce)
+	mux.HandleFunc("/directory", s.handleDirectory)
+	mux.HandleFunc("/new-nonce", s.handleNewNonce)
 	mux.HandleFunc("/new-account", s.handleNewAccount)
-	mux.HandleFunc("/new-order",   s.handleNewOrder)
-	mux.HandleFunc("/authz/",      s.handleAuthz)
-	mux.HandleFunc("/chall/",      s.handleChallenge)
-	mux.HandleFunc("/finalize/",   s.handleFinalize)
-	mux.HandleFunc("/cert/",       s.handleCert)
-	mux.HandleFunc("/order/",      s.handleOrder)
+	mux.HandleFunc("/new-order", s.handleNewOrder)
+	mux.HandleFunc("/authz/", s.handleAuthz)
+	mux.HandleFunc("/chall/", s.handleChallenge)
+	mux.HandleFunc("/finalize/", s.handleFinalize)
+	mux.HandleFunc("/cert/", s.handleCert)
+	mux.HandleFunc("/order/", s.handleOrder)
 
 	s.httpSrv = &http.Server{Handler: mux}
 	go func() { _ = s.httpSrv.Serve(ln) }()
@@ -197,9 +197,9 @@ func (s *Server) handleNewOrder(w http.ResponseWriter, r *http.Request) {
 	_, _ = rand.Read(tokenBytes)
 	token := B64uEncode(tokenBytes)
 
-	orderUrl    := s.baseURL + "/order/" + orderId
-	authzUrl    := s.baseURL + "/authz/" + authzId
-	challUrl    := s.baseURL + "/chall/" + challId
+	orderUrl := s.baseURL + "/order/" + orderId
+	authzUrl := s.baseURL + "/authz/" + authzId
+	challUrl := s.baseURL + "/chall/" + challId
 	finalizeUrl := s.baseURL + "/finalize/" + orderId
 
 	s.mu.Lock()
@@ -232,17 +232,20 @@ func (s *Server) handleAuthz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.consumeNonce(header.Nonce) {
-		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce"); return
+		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce")
+		return
 	}
 	if !s.verifyAccount(env, header) {
-		s.problem(w, 401, "urn:ietf:params:acme:error:unauthorized", "bad sig"); return
+		s.problem(w, 401, "urn:ietf:params:acme:error:unauthorized", "bad sig")
+		return
 	}
 	id := strings.TrimPrefix(r.URL.Path, "/authz/")
 	s.mu.Lock()
 	az, ok := s.authzs[id]
 	s.mu.Unlock()
 	if !ok {
-		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no authz"); return
+		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no authz")
+		return
 	}
 	challenges := make([]Challenge, 0, len(az.challengeIds))
 	s.mu.Lock()
@@ -266,44 +269,55 @@ func (s *Server) handleChallenge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.consumeNonce(header.Nonce) {
-		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce"); return
+		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce")
+		return
 	}
 	s.mu.Lock()
 	jwk, ok := s.accountJwks[header.Kid]
 	s.mu.Unlock()
 	if !ok {
-		s.problem(w, 401, "urn:ietf:params:acme:error:accountDoesNotExist", "unknown kid"); return
+		s.problem(w, 401, "urn:ietf:params:acme:error:accountDoesNotExist", "unknown kid")
+		return
 	}
 	accountPub, err := PublicKeyFromJWK(jwk)
 	if err != nil {
-		s.problem(w, 401, "urn:ietf:params:acme:error:accountDoesNotExist", err.Error()); return
+		s.problem(w, 401, "urn:ietf:params:acme:error:accountDoesNotExist", err.Error())
+		return
 	}
 	if _, err := Verify(env, accountPub); err != nil {
-		s.problem(w, 400, "urn:ietf:params:acme:error:malformed", "JWS sig fail"); return
+		s.problem(w, 400, "urn:ietf:params:acme:error:malformed", "JWS sig fail")
+		return
 	}
 	id := strings.TrimPrefix(r.URL.Path, "/chall/")
 	s.mu.Lock()
 	ch, ok := s.challenges[id]
 	s.mu.Unlock()
 	if !ok {
-		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no chall"); return
+		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no chall")
+		return
 	}
 	var payload ChallengeRespondPayload
 	if err := DecodePayload(env, &payload); err != nil || payload.AgentSignature == "" {
-		s.mu.Lock(); ch.status = StatusInvalid; s.mu.Unlock()
+		s.mu.Lock()
+		ch.status = StatusInvalid
+		s.mu.Unlock()
 		s.problem(w, 400, npsnip.ErrAcmeChallengeFailed,
 			"missing agent_signature in challenge response")
 		return
 	}
 	sig, err := B64uDecode(payload.AgentSignature)
 	if err != nil {
-		s.mu.Lock(); ch.status = StatusInvalid; s.mu.Unlock()
+		s.mu.Lock()
+		ch.status = StatusInvalid
+		s.mu.Unlock()
 		s.problem(w, 400, npsnip.ErrAcmeChallengeFailed,
 			fmt.Sprintf("agent-01 verification error: %v", err))
 		return
 	}
 	if !ed25519.Verify(accountPub, []byte(ch.token), sig) {
-		s.mu.Lock(); ch.status = StatusInvalid; s.mu.Unlock()
+		s.mu.Lock()
+		ch.status = StatusInvalid
+		s.mu.Unlock()
 		s.problem(w, 400, npsnip.ErrAcmeChallengeFailed,
 			"agent-01 signature did not verify")
 		return
@@ -332,17 +346,20 @@ func (s *Server) handleFinalize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.consumeNonce(header.Nonce) {
-		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce"); return
+		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce")
+		return
 	}
 	if !s.verifyAccount(env, header) {
-		s.problem(w, 401, "urn:ietf:params:acme:error:unauthorized", "bad sig"); return
+		s.problem(w, 401, "urn:ietf:params:acme:error:unauthorized", "bad sig")
+		return
 	}
 	orderId := strings.TrimPrefix(r.URL.Path, "/finalize/")
 	s.mu.Lock()
 	os, ok := s.orders[orderId]
 	s.mu.Unlock()
 	if !ok {
-		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no order"); return
+		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no order")
+		return
 	}
 	if os.status != StatusReady {
 		s.problem(w, 403, "urn:ietf:params:acme:error:orderNotReady",
@@ -351,7 +368,8 @@ func (s *Server) handleFinalize(w http.ResponseWriter, r *http.Request) {
 	}
 	var fp FinalizePayload
 	if err := DecodePayload(env, &fp); err != nil || fp.CSR == "" {
-		s.problem(w, 400, "urn:ietf:params:acme:error:malformed", "missing csr"); return
+		s.problem(w, 400, "urn:ietf:params:acme:error:malformed", "missing csr")
+		return
 	}
 	csrDer, err := B64uDecode(fp.CSR)
 	if err != nil {
@@ -419,17 +437,20 @@ func (s *Server) handleCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.consumeNonce(header.Nonce) {
-		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce"); return
+		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce")
+		return
 	}
 	if !s.verifyAccount(env, header) {
-		s.problem(w, 401, "urn:ietf:params:acme:error:unauthorized", "bad sig"); return
+		s.problem(w, 401, "urn:ietf:params:acme:error:unauthorized", "bad sig")
+		return
 	}
 	certId := strings.TrimPrefix(r.URL.Path, "/cert/")
 	s.mu.Lock()
 	pem, ok := s.certs[certId]
 	s.mu.Unlock()
 	if !ok {
-		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no cert"); return
+		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no cert")
+		return
 	}
 	w.Header().Set("Content-Type", ContentTypePemCert)
 	w.Header().Set("Replay-Nonce", s.mintNonce())
@@ -443,17 +464,20 @@ func (s *Server) handleOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.consumeNonce(header.Nonce) {
-		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce"); return
+		s.problem(w, 400, "urn:ietf:params:acme:error:badNonce", "invalid nonce")
+		return
 	}
 	if !s.verifyAccount(env, header) {
-		s.problem(w, 401, "urn:ietf:params:acme:error:unauthorized", "bad sig"); return
+		s.problem(w, 401, "urn:ietf:params:acme:error:unauthorized", "bad sig")
+		return
 	}
 	orderId := strings.TrimPrefix(r.URL.Path, "/order/")
 	s.mu.Lock()
 	os, ok := s.orders[orderId]
 	s.mu.Unlock()
 	if !ok {
-		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no order"); return
+		s.problem(w, 404, "urn:ietf:params:acme:error:malformed", "no order")
+		return
 	}
 	authzUrl := s.baseURL + "/authz/" + os.authzId
 	w.Header().Set("Replay-Nonce", s.mintNonce())

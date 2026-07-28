@@ -9,8 +9,8 @@ const (
 	ContentTypeProblem  = "application/problem+json"
 	ContentTypePemCert  = "application/pem-certificate-chain"
 
-	ChallengeAgent01    = "agent-01"
-	IdentifierTypeNID   = "nid"
+	ChallengeAgent01  = "agent-01"
+	IdentifierTypeNID = "nid"
 )
 
 // ACME status enumeration values (RFC 8555 §7.1.6).

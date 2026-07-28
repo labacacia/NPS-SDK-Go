@@ -39,11 +39,11 @@ type VerifyOptions struct {
 // Verify validates an NPS X.509 NID certificate chain per NPS-RFC-0002 §4.6.
 //
 // Stages:
-//   1. Decode chain (base64url DER → x509.Certificate).
-//   2. Leaf EKU check — critical, contains agent-identity OR node-identity OID.
-//   3. Subject CN / SAN URI match against asserted NID.
-//   4. Assurance-level extension match against asserted level (if both present).
-//   5. Chain signature verification — leaf → intermediates → trusted root.
+//  1. Decode chain (base64url DER → x509.Certificate).
+//  2. Leaf EKU check — critical, contains agent-identity OR node-identity OID.
+//  3. Subject CN / SAN URI match against asserted NID.
+//  4. Assurance-level extension match against asserted level (if both present).
+//  5. Chain signature verification — leaf → intermediates → trusted root.
 func Verify(opts VerifyOptions) VerifyResult {
 	if len(opts.CertChainBase64UrlDer) == 0 {
 		return fail(npsnip.ErrCertFormatInvalid, "cert_chain is empty")

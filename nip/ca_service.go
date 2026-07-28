@@ -157,8 +157,10 @@ type NipVerifyResult struct {
 	Record    *NipCertRecord
 }
 
-func verifyOk(r *NipCertRecord) NipVerifyResult  { return NipVerifyResult{Valid: true, Record: r} }
-func verifyFail(code, msg string) NipVerifyResult { return NipVerifyResult{Valid: false, ErrorCode: code, Message: msg} }
+func verifyOk(r *NipCertRecord) NipVerifyResult { return NipVerifyResult{Valid: true, Record: r} }
+func verifyFail(code, msg string) NipVerifyResult {
+	return NipVerifyResult{Valid: false, ErrorCode: code, Message: msg}
+}
 
 // NipCaService is the core CA business logic (NPS-3 §6–8).
 type NipCaService struct {

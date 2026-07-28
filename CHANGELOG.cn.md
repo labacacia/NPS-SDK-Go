@@ -8,6 +8,17 @@
 
 ---
 
+## [1.0.0-alpha.17] —— 未发布
+
+### 新增
+
+- 将参考服务端能力移植到 Go SDK：NCP 原生传输、NWP action/complex/memory 节点与双向 bridge、NIP CA 服务与完整校验、NOP 编排、daemon observability，以及 telemetry。
+
+### 变更
+
+- 要求 Go 1.26.5 或更高版本，确保发布构建包含当前标准库安全修复。
+- 对整个 SDK 应用标准 `gofmt` 格式。
+
 ## [1.0.0-alpha.16] —— 2026-07-23
 
 ### 变更

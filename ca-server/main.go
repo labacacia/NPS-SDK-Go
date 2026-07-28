@@ -20,17 +20,17 @@ import (
 )
 
 func main() {
-	caNID      := mustEnv("NIP_CA_NID")
+	caNID := mustEnv("NIP_CA_NID")
 	passphrase := mustEnv("NIP_CA_PASSPHRASE")
-	baseURL    := mustEnv("NIP_CA_BASE_URL")
+	baseURL := mustEnv("NIP_CA_BASE_URL")
 
-	keyFile     := envStr("NIP_CA_KEY_FILE",     "/data/ca.key.enc")
-	dbPath      := envStr("NIP_CA_DB_PATH",      "/data/ca.db")
+	keyFile := envStr("NIP_CA_KEY_FILE", "/data/ca.key.enc")
+	dbPath := envStr("NIP_CA_DB_PATH", "/data/ca.db")
 	displayName := envStr("NIP_CA_DISPLAY_NAME", "NPS CA")
-	agentDays   := envInt("NIP_CA_AGENT_VALIDITY_DAYS", 30)
-	nodeDays    := envInt("NIP_CA_NODE_VALIDITY_DAYS",  90)
+	agentDays := envInt("NIP_CA_AGENT_VALIDITY_DAYS", 30)
+	nodeDays := envInt("NIP_CA_NODE_VALIDITY_DAYS", 90)
 	renewalDays := envInt("NIP_CA_RENEWAL_WINDOW_DAYS", 7)
-	port        := envStr("PORT", "17440")
+	port := envStr("PORT", "17440")
 
 	sk := loadOrGenKey(keyFile, passphrase)
 

@@ -99,8 +99,8 @@ type X509ChainVerifier func(
 
 // NipIdentVerifier — Phase 1 dual-trust IdentFrame verifier.
 type NipIdentVerifier struct {
-	Options       VerifierOptions
-	X509Verifier  X509ChainVerifier // optional — required only for Step 3b
+	Options      VerifierOptions
+	X509Verifier X509ChainVerifier // optional — required only for Step 3b
 }
 
 func NewNipIdentVerifier(opts VerifierOptions, x509Verifier X509ChainVerifier) *NipIdentVerifier {

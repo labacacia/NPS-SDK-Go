@@ -150,13 +150,13 @@ func ValidateComplexChildURL(childURL string, allowedPrefixes []string, rejectPr
 
 // ComplexNodeServer is an http.Handler hosting a single Complex Node.
 type ComplexNodeServer struct {
-	provider   IComplexNodeProvider
-	opts       ComplexNodeOptions
-	prefix     string
-	anchorID   string
-	http       *http.Client
-	nwmJSON    []byte
-	schemaJSON []byte
+	provider    IComplexNodeProvider
+	opts        ComplexNodeOptions
+	prefix      string
+	anchorID    string
+	http        *http.Client
+	nwmJSON     []byte
+	schemaJSON  []byte
 	actionsJSON []byte
 }
 

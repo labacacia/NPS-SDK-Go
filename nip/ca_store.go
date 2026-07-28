@@ -65,7 +65,7 @@ func (s *InMemoryNipCaStore) Save(record *NipCertRecord) error {
 	// the initial Save.
 	for _, r := range s.records {
 		if r.Serial == record.Serial {
-			return fmt.Errorf("Serial already exists: %s", record.Serial)
+			return fmt.Errorf("serial already exists: %s", record.Serial)
 		}
 	}
 	s.records = append(s.records, copyRecord(record))

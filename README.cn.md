@@ -1,9 +1,9 @@
 [English Version](./README.md) | 中文版
 
-# NPS Go SDK v1.0.0-alpha.16
+# NPS Go SDK v1.0.0-alpha.17
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
-[![Release](https://img.shields.io/badge/release-v1.0.0--alpha.16-orange.svg)](../../CHANGELOG.cn.md)
+[![Release](https://img.shields.io/badge/release-v1.0.0--alpha.17-orange.svg)](../../CHANGELOG.cn.md)
 [![NCP](https://img.shields.io/badge/NCP-v0.9-5b8cff.svg)]()
 [![NWP](https://img.shields.io/badge/NWP-v0.14-4af0b0.svg)]()
 [![NIP](https://img.shields.io/badge/NIP-v0.10-7b61ff.svg)]()
@@ -15,8 +15,8 @@ Neural Protocol Suite (NPS) 的 Go 参考实现 —— 覆盖五个子协议：*
 | | |
 |---|---|
 | **Module** | `github.com/labacacia/NPS-sdk-go` |
-| **Go** | 1.25+ |
-| **测试** | 86 通过 |
+| **Go** | 1.26.5+ |
+| **测试** | 434 通过 |
 | **许可证** | Apache 2.0 |
 
 Alpha.14 候选新增：远程 NIP CA 类型化客户端（`nip.NipCaClient`）、native-mode NWP 服务端 helper（`nwp.NwpNativeNodeServer`）和 TC-N1/TC-N2 一致性 manifest helper（`conformance`）。
@@ -36,12 +36,14 @@ Alpha.14 候选新增：远程 NIP CA 类型化客户端（`nip.NipCaClient`）�
 | `ndp` | NDP | AnnounceFrame、ResolveFrame、GraphFrame、InMemoryNdpRegistry、NdpAnnounceValidator |
 | `nop` | NOP | TaskFrame、DelegateFrame、SyncFrame、AlignStreamFrame、NopClient |
 | `conformance` | CI / 认证 | TC-N1/TC-N2 一致性用例目录、manifest 构造器和校验器 |
+| `daemon/observability` | Runtime | 健康检查、就绪检查、指标、结构化日志与优雅停机 helper |
+| `telemetry` | Runtime | 轻量级 counter、histogram 与 span 记录 |
 
 ---
 
-## main 分支未发布内容
+## Alpha.17 候选版
 
-`main` 分支额外携带 **alpha.16 周期的服务端面 parity 移植**（尚未进入任何已发布包；随下一个套件版本发布）：
+此候选版携带计划在下一套件版本发布的 **alpha.17 服务端能力对齐**：
 
 - **NOP 编排引擎** —— DAG 校验器、条件求值器、输入映射、结果聚合、任务存储、Worker 客户端、回调校验、instrumentation
 - **NCP 原生模式传输** —— server、session、client、帧 IO、握手 caps、编码策略、patch 格式
@@ -199,10 +201,10 @@ for _, c := range cases {
 manifest := conformance.NewManifest(
     conformance.NodeL1,
     "my-node",
-    "1.0.0-alpha.16",
+    "1.0.0-alpha.17",
     "urn:nps:node:example.com:my-node",
     "labacacia-fixture",
-    "1.0.0-alpha.16",
+    "1.0.0-alpha.17",
     results,
     "ci",
 )

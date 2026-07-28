@@ -440,8 +440,10 @@ func TestAnchorCache_ComputeAnchorID_Deterministic(t *testing.T) {
 // TestComputeAnchorID_GoldenVector pins the cross-SDK anchor_id computed by the
 // .NET reference SDK (AnchorIdComputer) over the structured FrameSchema. The
 // canonical JCS form is:
-//   {"fields":[{"name":"id","nullable":false,"type":"uint64"},
-//              {"name":"label","nullable":true,"semantic":"entity.label","type":"string"}]}
+//
+//	{"fields":[{"name":"id","nullable":false,"type":"uint64"},
+//	           {"name":"label","nullable":true,"semantic":"entity.label","type":"string"}]}
+//
 // with per-field key order name,nullable,semantic(omitted if null),type.
 func TestComputeAnchorID_GoldenVector(t *testing.T) {
 	schema := core.FrameDict{

@@ -12,8 +12,8 @@ type AssuranceLevel struct {
 
 var (
 	AssuranceAnonymous = AssuranceLevel{Wire: "anonymous", Rank: 0}
-	AssuranceAttested  = AssuranceLevel{Wire: "attested",  Rank: 1}
-	AssuranceVerified  = AssuranceLevel{Wire: "verified",  Rank: 2}
+	AssuranceAttested  = AssuranceLevel{Wire: "attested", Rank: 1}
+	AssuranceVerified  = AssuranceLevel{Wire: "verified", Rank: 2}
 )
 
 // MeetsOrExceeds reports whether l satisfies the required minimum.

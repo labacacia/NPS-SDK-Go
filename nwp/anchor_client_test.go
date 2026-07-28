@@ -15,10 +15,6 @@ import (
 	"github.com/labacacia/NPS-sdk-go/nwp"
 )
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-func ptr[T any](v T) *T { return &v }
-
 // snapshotServer creates an httptest.Server that serves a topology.snapshot
 // CapsFrame response at /query. The handler captures the raw request body.
 func snapshotServer(t *testing.T, snap map[string]any, capturedBody *map[string]any) *httptest.Server {
