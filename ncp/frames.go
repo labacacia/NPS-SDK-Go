@@ -55,9 +55,15 @@ func (f *AnchorFrame) ToDict() core.FrameDict {
 		"schema":    f.Schema,
 		"ttl":       f.TTL,
 	}
-	if f.Namespace != nil   { d["namespace"] = *f.Namespace }
-	if f.Description != nil { d["description"] = *f.Description }
-	if f.NodeType != nil    { d["node_type"] = *f.NodeType }
+	if f.Namespace != nil {
+		d["namespace"] = *f.Namespace
+	}
+	if f.Description != nil {
+		d["description"] = *f.Description
+	}
+	if f.NodeType != nil {
+		d["node_type"] = *f.NodeType
+	}
 	return d
 }
 
@@ -68,10 +74,12 @@ func AnchorFrameFromDict(d core.FrameDict) *AnchorFrame {
 		Schema:   schema,
 		TTL:      toUint64(d["ttl"]),
 	}
-	if f.TTL == 0 { f.TTL = 3600 }
-	f.Namespace   = optStr(d, "namespace")
+	if f.TTL == 0 {
+		f.TTL = 3600
+	}
+	f.Namespace = optStr(d, "namespace")
 	f.Description = optStr(d, "description")
-	f.NodeType    = optStr(d, "node_type")
+	f.NodeType = optStr(d, "node_type")
 	return f
 }
 
@@ -294,10 +302,18 @@ func (f *HelloFrame) ToDict() core.FrameDict {
 		"ext_support":            f.ExtSupport,
 		"max_concurrent_streams": maxStreams,
 	}
-	if f.MinVersion != nil          { d["min_version"]        = *f.MinVersion }
-	if f.AgentID != nil             { d["agent_id"]           = *f.AgentID }
-	if f.E2eEncAlgorithms != nil    { d["e2e_enc_algorithms"] = f.E2eEncAlgorithms }
-	if f.PingIntervalMs > 0         { d["ping_interval_ms"]   = f.PingIntervalMs }
+	if f.MinVersion != nil {
+		d["min_version"] = *f.MinVersion
+	}
+	if f.AgentID != nil {
+		d["agent_id"] = *f.AgentID
+	}
+	if f.E2eEncAlgorithms != nil {
+		d["e2e_enc_algorithms"] = f.E2eEncAlgorithms
+	}
+	if f.PingIntervalMs > 0 {
+		d["ping_interval_ms"] = f.PingIntervalMs
+	}
 	return d
 }
 
@@ -366,7 +382,9 @@ func (f *ErrorFrame) FrameType() core.FrameType { return core.FrameTypeError }
 
 func (f *ErrorFrame) ToDict() core.FrameDict {
 	d := core.FrameDict{"error_code": f.ErrorCode, "message": f.Message}
-	if f.Detail != nil { d["detail"] = f.Detail }
+	if f.Detail != nil {
+		d["detail"] = f.Detail
+	}
 	return d
 }
 

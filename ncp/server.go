@@ -3,7 +3,6 @@
 package ncp
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"time"
@@ -32,8 +31,16 @@ type NcpServerOptions struct {
 	MaxHelloPayload uint64
 
 	// HandshakeReadTimeout is the wall-clock budget for the preamble, frame
-	// header, and Hello payload read. Zero disables the deadline.
+	// read. The name is retained for source compatibility. Zero disables it.
 	HandshakeReadTimeout time.Duration
+
+	// HelloReadTimeout is the separate budget for the Hello header and payload.
+	// Zero disables it.
+	HelloReadTimeout time.Duration
+
+	// HandshakeProfile controls deterministic version, encoding, protocol, and
+	// resource-limit negotiation. Nil uses the portable v0.11 defaults.
+	HandshakeProfile *NcpHandshakeProfile
 }
 
 func (o *NcpServerOptions) withDefaults() NcpServerOptions {
@@ -46,6 +53,13 @@ func (o *NcpServerOptions) withDefaults() NcpServerOptions {
 	}
 	if out.HandshakeReadTimeout == 0 && (o == nil) {
 		out.HandshakeReadTimeout = PreambleReadTimeoutSecs * time.Second
+	}
+	if out.HelloReadTimeout == 0 && (o == nil) {
+		out.HelloReadTimeout = 5 * time.Second
+	}
+	if out.HandshakeProfile == nil {
+		profile := DefaultNcpHandshakeProfile()
+		out.HandshakeProfile = &profile
 	}
 	return out
 }
@@ -111,20 +125,19 @@ func (s *NcpServer) handshake(rawConn net.Conn) (*NcpServerConnection, error) {
 		return nil, err
 	}
 
-	// 2 — read frame header.
+	if s.options.HelloReadTimeout > 0 {
+		_ = conn.SetReadDeadline(time.Now().Add(s.options.HelloReadTimeout))
+	} else {
+		_ = conn.SetReadDeadline(time.Time{})
+	}
+
+	// 2 — read and validate the frame header before allocating payload.
 	header, err := ReadFrameHeader(conn)
 	if err != nil {
 		return nil, err
 	}
-	if header.FrameType != core.FrameTypeHello {
-		return nil, &core.ErrFrame{Msg: fmt.Sprintf(
-			"Expected HelloFrame (0x%02X) as first frame after preamble, got 0x%02X.",
-			byte(core.FrameTypeHello), byte(header.FrameType))}
-	}
-	if header.PayloadLength > s.options.MaxHelloPayload {
-		return nil, &core.ErrFrame{Msg: fmt.Sprintf(
-			"HelloFrame payload length %d exceeds configured maximum %d bytes.",
-			header.PayloadLength, s.options.MaxHelloPayload)}
+	if decision := EvaluateHelloHeader(header, 0, s.options.HelloReadTimeout, s.options.MaxHelloPayload); decision.Action != NcpHandshakeContinue {
+		return nil, &core.ErrFrame{Msg: "Invalid native NCP Hello header."}
 	}
 
 	// 3 — read payload and deserialise HelloFrame.
@@ -134,9 +147,7 @@ func (s *NcpServer) handshake(rawConn net.Conn) (*NcpServerConnection, error) {
 	}
 
 	// Clear the handshake deadline now that the Hello has been read.
-	if s.options.HandshakeReadTimeout > 0 {
-		_ = conn.SetReadDeadline(time.Time{})
-	}
+	_ = conn.SetReadDeadline(time.Time{})
 
 	wire := append(header.ToBytes(), payload...)
 	_, dict, err := s.codec.Decode(wire)
@@ -149,6 +160,7 @@ func (s *NcpServer) handshake(rawConn net.Conn) (*NcpServerConnection, error) {
 		conn:        conn,
 		codec:       s.codec,
 		ClientHello: hello,
+		profile:     *s.options.HandshakeProfile,
 	}, nil
 }
 
@@ -181,6 +193,7 @@ type NcpServerConnection struct {
 
 	// ClientHello is the HelloFrame sent by the connecting client.
 	ClientHello *HelloFrame
+	profile     NcpHandshakeProfile
 }
 
 // Accept sends serverCaps to the client and returns a live NcpSession. The
@@ -188,15 +201,37 @@ type NcpServerConnection struct {
 // serverCaps NegotiatedEncoding and EnabledEncodings fields are overwritten with
 // the negotiated values.
 func (c *NcpServerConnection) Accept(serverCaps *NcpHandshakeCapsFrame) (*NcpSession, error) {
-	policy, err := negotiateEncodingPolicy(c.ClientHello)
-	if err != nil {
-		return nil, err
+	decision := NegotiateHandshake(c.profile, c.ClientHello)
+	if decision.Action != NcpHandshakeAccept {
+		errCode := decision.Error
+		if errCode == "" {
+			errCode = ErrVersionIncompatible
+		}
+		status := decision.Status
+		if status == "" {
+			status = core.NpsProtoVersionIncompatible
+		}
+		_ = c.Reject(&ErrorFrame{
+			ErrorCode: errCode,
+			Message:   "Native NCP handshake negotiation failed.",
+			Detail:    map[string]any{"status": status},
+		})
+		return nil, &core.ErrFrame{Msg: "[" + errCode + "] Native NCP handshake negotiation failed."}
 	}
 
-	negotiated := EncodingToken(policy.DefaultTier)
+	tier := core.EncodingTierJSON
+	if decision.NegotiatedEncoding == "msgpack" {
+		tier = core.EncodingTierMsgPack
+	}
+	policy := NewNcpEncodingPolicy(tier, containsToken(decision.EnabledEncodings, "binary_vector.v1"))
 	caps := *serverCaps
-	caps.NegotiatedEncoding = &negotiated
-	caps.EnabledEncodings = policy.EnabledEncodings()
+	caps.NegotiatedEncoding = &decision.NegotiatedEncoding
+	caps.EnabledEncodings = decision.EnabledEncodings
+	caps.SessionVersion = &decision.SessionVersion
+	caps.SupportedProtocols = decision.SupportedProtocols
+	caps.MaxFramePayload = decision.MaxFramePayload
+	caps.ExtSupport = decision.ExtSupport
+	caps.MaxConcurrentStreams = decision.MaxConcurrentStreams
 
 	wire, err := c.codec.Encode(caps.FrameType(), caps.ToDict(), policy.DefaultTier, true)
 	if err != nil {

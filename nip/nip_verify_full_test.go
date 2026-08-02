@@ -120,6 +120,29 @@ func TestVerifyFull_Step4_LocalCRL(t *testing.T) {
 	assertFail(t, r, 4, npsnip.ErrCertRevoked)
 }
 
+func TestVerifyFull_Step4_RequiredWithoutSourceFailsClosed(t *testing.T) {
+	caPub, caPriv, _ := ed25519.GenerateKey(rand.Reader)
+	frame := buildSignedFrame(t, caPriv, nil)
+	v := fullVerifier(caPub, func(o *npsnip.VerifierOptions) {
+		o.RevocationMode = npsnip.NipRevocationRequired
+	})
+	r := v.VerifyFull(context.Background(), frame, nil)
+	assertFail(t, r, 4, npsnip.ErrOcspUnavailable)
+}
+
+func TestVerifyFull_Step4_RequiredAcceptsConfiguredEmptyLocalCRL(t *testing.T) {
+	caPub, caPriv, _ := ed25519.GenerateKey(rand.Reader)
+	frame := buildSignedFrame(t, caPriv, nil)
+	v := fullVerifier(caPub, func(o *npsnip.VerifierOptions) {
+		o.LocalRevokedSerials = map[string]struct{}{}
+		o.RevocationMode = npsnip.NipRevocationRequired
+	})
+	r := v.VerifyFull(context.Background(), frame, nil)
+	if !r.Valid {
+		t.Fatalf("expected valid; step=%d code=%s msg=%s", r.StepFailed, r.ErrorCode, r.Message)
+	}
+}
+
 func TestVerifyFull_Step4_RevocationCallback(t *testing.T) {
 	caPub, caPriv, _ := ed25519.GenerateKey(rand.Reader)
 	frame := buildSignedFrame(t, caPriv, nil)

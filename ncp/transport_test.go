@@ -94,6 +94,13 @@ func TestHandshake_HappyPath(t *testing.T) {
 	if len(sess.ServerCaps.Caps) != 3 {
 		t.Errorf("wrong caps: %v", sess.ServerCaps.Caps)
 	}
+	if sess.ServerCaps.SessionVersion == nil || *sess.ServerCaps.SessionVersion != "0.2" {
+		t.Errorf("wrong session version: %v", sess.ServerCaps.SessionVersion)
+	}
+	if sess.ServerCaps.MaxFramePayload == nil ||
+		*sess.ServerCaps.MaxFramePayload != ncp.HelloDefaultMaxFramePayload {
+		t.Errorf("wrong max frame payload: %v", sess.ServerCaps.MaxFramePayload)
+	}
 	if !sess.IsConnected() {
 		t.Error("session should report connected")
 	}

@@ -36,17 +36,12 @@ type IdentFrame struct {
 	PubKey    string
 	Meta      map[string]any
 	Signature *string
-
-	// NPS-3 §5.1 core cert fields (wire: issued_by, issued_at, expires_at,
-	// serial, capabilities, scope). The full six-step NPS-3 §7 verifier
-	// (VerifyFull) consumes these; the legacy dual-trust Verify does not.
-	IssuedBy     string
-	IssuedAt     string
-	ExpiresAt    string
-	Serial       string
-	Capabilities []string
-	// Scope is the raw scope object, e.g. {"nodes":[...],"actions":[...]}.
-	Scope map[string]any
+	Scope     map[string]any
+	Lineage   map[string]any
+	IssuedBy  string
+	IssuedAt  string
+	ExpiresAt string
+	Serial    string
 
 	// NPS-RFC-0003 — optional assurance level.
 	AssuranceLevel *AssuranceLevel
@@ -58,12 +53,15 @@ type IdentFrame struct {
 	// OCSPStaple is a base64-encoded OCSP response stapled to this identity frame (alpha.11).
 	OCSPStaple string
 	// NodeRoles is a list of self-declared node-role tags (NIP v0.10 alpha.13).
+	// Excluded from the v1 signed payload, matching the reference impl.
 	NodeRoles []string
-
-	// lineage is the CA-issued signed lineage object (NPS-CR-0003 §5.1.3),
-	// present on group / session frames. Emitted as the top-level "lineage"
-	// wire field by the CA router; not part of the v1 UnsignedDict.
-	lineage map[string]any
+	// Capabilities is the set of capabilities this identity claims. NIP v0.12
+	// §7.5 Phase-3 enforcement checks it is a subset of the CA-attested
+	// id-nps-capabilities extension. Unlike NodeRoles it IS part of the v1 signed
+	// payload (the reference NipSigner excludes node_roles but not capabilities);
+	// it is emitted only when non-empty, so frames that omit it canonicalize
+	// exactly as before.
+	Capabilities []string
 }
 
 func (f *IdentFrame) FrameType() core.FrameType { return core.FrameTypeIdent }
@@ -79,11 +77,15 @@ func (f *IdentFrame) UnsignedDict() core.FrameDict {
 	if f.AssuranceLevel != nil {
 		d["assurance_level"] = f.AssuranceLevel.Wire
 	}
-	return d
-}
-
-func (f *IdentFrame) ToDict() core.FrameDict {
-	d := f.UnsignedDict()
+	if len(f.Capabilities) > 0 {
+		d["capabilities"] = f.Capabilities
+	}
+	if f.Scope != nil {
+		d["scope"] = f.Scope
+	}
+	if f.Lineage != nil {
+		d["lineage"] = f.Lineage
+	}
 	if f.IssuedBy != "" {
 		d["issued_by"] = f.IssuedBy
 	}
@@ -96,12 +98,11 @@ func (f *IdentFrame) ToDict() core.FrameDict {
 	if f.Serial != "" {
 		d["serial"] = f.Serial
 	}
-	if f.Capabilities != nil {
-		d["capabilities"] = f.Capabilities
-	}
-	if f.Scope != nil {
-		d["scope"] = f.Scope
-	}
+	return d
+}
+
+func (f *IdentFrame) ToDict() core.FrameDict {
+	d := f.UnsignedDict()
 	if f.Signature != nil {
 		d["signature"] = *f.Signature
 	}
@@ -117,6 +118,7 @@ func (f *IdentFrame) ToDict() core.FrameDict {
 	if f.NodeRoles != nil {
 		d["node_roles"] = f.NodeRoles
 	}
+	// capabilities is already emitted by UnsignedDict (it is inside the signed body).
 	return d
 }
 
@@ -124,6 +126,14 @@ func IdentFrameFromDict(d core.FrameDict) *IdentFrame {
 	var meta map[string]any
 	if v, ok := d["metadata"].(map[string]any); ok {
 		meta = v
+	}
+	var scope map[string]any
+	if v, ok := d["scope"].(map[string]any); ok {
+		scope = v
+	}
+	var lineage map[string]any
+	if v, ok := d["lineage"].(map[string]any); ok {
+		lineage = v
 	}
 	var assurance *AssuranceLevel
 	if v, ok := d["assurance_level"].(string); ok {
@@ -142,37 +152,25 @@ func IdentFrameFromDict(d core.FrameDict) *IdentFrame {
 			}
 		}
 	}
-	var nodeRoles []string
-	switch v := d["node_roles"].(type) {
-	case []string:
-		nodeRoles = v
-	case []any:
-		for _, item := range v {
-			if s, ok := item.(string); ok {
-				nodeRoles = append(nodeRoles, s)
-			}
-		}
-	}
-	var scope map[string]any
-	if v, ok := d["scope"].(map[string]any); ok {
-		scope = v
-	}
+	nodeRoles := stringSlice(d["node_roles"])
+	capabilities := stringSlice(d["capabilities"])
 	return &IdentFrame{
 		NID:            str(d, "nid"),
 		PubKey:         str(d, "pub_key"),
 		Meta:           meta,
 		Signature:      optStr(d, "signature"),
+		Scope:          scope,
+		Lineage:        lineage,
 		IssuedBy:       str(d, "issued_by"),
 		IssuedAt:       str(d, "issued_at"),
 		ExpiresAt:      str(d, "expires_at"),
 		Serial:         str(d, "serial"),
-		Capabilities:   stringSlice(d["capabilities"]),
-		Scope:          scope,
 		AssuranceLevel: assurance,
 		CertFormat:     optStr(d, "cert_format"),
 		CertChain:      chain,
 		OCSPStaple:     str(d, "ocsp_staple"),
 		NodeRoles:      nodeRoles,
+		Capabilities:   capabilities,
 	}
 }
 

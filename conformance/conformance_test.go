@@ -25,7 +25,7 @@ func TestValidatorAcceptsCompleteL1Manifest(t *testing.T) {
 		}
 		results = append(results, CaseResult{ID: c.ID, Result: result})
 	}
-	manifest := NewManifest(NodeL1, "node", "0.1.0", "urn:nps:node:example.test:node-1", "reference", "1.0.0-alpha.16", results, "")
+	manifest := NewManifest(NodeL1, "node", "0.1.0", "urn:nps:node:example.test:node-1", "reference", "1.0.0-alpha.17", results, "")
 
 	if validation := ValidateManifest(manifest); !validation.Valid {
 		t.Fatalf("expected valid manifest: %s", validation.Message)
@@ -37,7 +37,7 @@ func TestValidatorRejectsMissingCase(t *testing.T) {
 	for _, c := range NodeL1Cases[:len(NodeL1Cases)-1] {
 		results = append(results, CaseResult{ID: c.ID, Result: "pass"})
 	}
-	manifest := NewManifest(NodeL1, "node", "0.1.0", "urn:nps:node:example.test:node-1", "reference", "1.0.0-alpha.16", results, "")
+	manifest := NewManifest(NodeL1, "node", "0.1.0", "urn:nps:node:example.test:node-1", "reference", "1.0.0-alpha.17", results, "")
 
 	if validation := ValidateManifest(manifest); validation.Valid {
 		t.Fatal("expected invalid manifest")

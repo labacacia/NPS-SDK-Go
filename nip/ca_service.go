@@ -157,8 +157,10 @@ type NipVerifyResult struct {
 	Record    *NipCertRecord
 }
 
-func verifyOk(r *NipCertRecord) NipVerifyResult  { return NipVerifyResult{Valid: true, Record: r} }
-func verifyFail(code, msg string) NipVerifyResult { return NipVerifyResult{Valid: false, ErrorCode: code, Message: msg} }
+func verifyOk(r *NipCertRecord) NipVerifyResult { return NipVerifyResult{Valid: true, Record: r} }
+func verifyFail(code, msg string) NipVerifyResult {
+	return NipVerifyResult{Valid: false, ErrorCode: code, Message: msg}
+}
 
 // NipCaService is the core CA business logic (NPS-3 §6–8).
 type NipCaService struct {
@@ -271,14 +273,14 @@ func (s *NipCaService) issueFrame(
 		Serial:         serial,
 		Capabilities:   caps,
 		Scope:          scope,
+		Lineage:        lineage,
 		AssuranceLevel: assurance,
 	}
-	f.lineage = lineage
 	return f, nil
 }
 
 // frameLineage returns the lineage object attached to an issued frame, or nil.
-func frameLineage(f *IdentFrame) map[string]any { return f.lineage }
+func frameLineage(f *IdentFrame) map[string]any { return f.Lineage }
 
 func (s *NipCaService) checkAllowedCaps(capabilities []string) error {
 	if s.opts.AllowedCapabilities == nil {

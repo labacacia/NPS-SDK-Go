@@ -148,6 +148,10 @@ func TestRouterOperatorAuth(t *testing.T) {
 	if status != 401 {
 		t.Fatalf("expected 401 without token, got %d", status)
 	}
+	status, _ = doJSON(t, "GET", srv.URL+"/v1/certificates", nil)
+	if status != 401 {
+		t.Fatalf("expected certificate inventory 401 without token, got %d", status)
+	}
 
 	// With bearer → 201.
 	b, _ := json.Marshal(map[string]any{"identifier": "a", "pub_key": freshPubKey(t)})
@@ -161,6 +165,24 @@ func TestRouterOperatorAuth(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != 201 {
 		t.Fatalf("expected 201 with token, got %d", resp.StatusCode)
+	}
+
+	listReq, _ := http.NewRequest("GET", srv.URL+"/v1/certificates", nil)
+	listReq.Header.Set("Authorization", "Bearer secret-key")
+	listResp, err := http.DefaultClient.Do(listReq)
+	if err != nil {
+		t.Fatalf("list certificates: %v", err)
+	}
+	defer listResp.Body.Close()
+	if listResp.StatusCode != 200 {
+		t.Fatalf("expected certificate inventory 200, got %d", listResp.StatusCode)
+	}
+	var list npsnip.NipCaCertificateList
+	if err := json.NewDecoder(listResp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Entries) != 1 {
+		t.Fatalf("expected one certificate, got %d", len(list.Entries))
 	}
 }
 
@@ -330,5 +352,13 @@ func TestRouterCrl(t *testing.T) {
 	entries, _ := body["entries"].([]any)
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 CRL entry, got %d", len(entries))
+	}
+	raw, _ := json.Marshal(body)
+	var crl npsnip.NipCaCrl
+	if err := json.Unmarshal(raw, &crl); err != nil {
+		t.Fatal(err)
+	}
+	if !npsnip.VerifyCrlSignature(&crl, ca.GetCaPublicKey()) {
+		t.Fatal("generated CRL signature did not verify")
 	}
 }

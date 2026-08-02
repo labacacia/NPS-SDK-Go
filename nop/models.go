@@ -177,7 +177,7 @@ type TaskContext struct {
 type BackoffStrategy int
 
 const (
-	BackoffFixed       BackoffStrategy = iota
+	BackoffFixed BackoffStrategy = iota
 	BackoffLinear
 	BackoffExponential
 )

@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/labacacia/NPS-sdk-go/core"
 )
 
 // NipCaClient is a typed HTTP client for remote NIP CA routes.
@@ -78,6 +80,26 @@ type NipCaCrl struct {
 	Signature string          `json:"signature"`
 }
 
+type NipCaCertificateRecord struct {
+	NID          string   `json:"nid"`
+	EntityType   string   `json:"entity_type"`
+	Serial       string   `json:"serial"`
+	PubKey       string   `json:"pub_key"`
+	Capabilities []string `json:"capabilities"`
+	Scope        any      `json:"scope"`
+	IssuedBy     string   `json:"issued_by"`
+	IssuedAt     string   `json:"issued_at"`
+	ExpiresAt    string   `json:"expires_at"`
+	RevokedAt    *string  `json:"revoked_at,omitempty"`
+	RevokeReason *string  `json:"revoke_reason,omitempty"`
+	NidRole      *string  `json:"nid_role,omitempty"`
+	ParentNID    *string  `json:"parent_nid,omitempty"`
+}
+
+type NipCaCertificateList struct {
+	Entries []NipCaCertificateRecord `json:"entries"`
+}
+
 type NipCaRevokeFrame struct {
 	Frame     string `json:"frame,omitempty"`
 	TargetNID string `json:"target_nid,omitempty"`
@@ -130,6 +152,38 @@ func (c *NipCaClient) GetCrl(ctx context.Context) (*NipCaCrl, error) {
 		return nil, err
 	}
 	return &out, nil
+}
+
+func (c *NipCaClient) GetCertificates(ctx context.Context, bearerToken string) (*NipCaCertificateList, error) {
+	var out NipCaCertificateList
+	if err := c.sendJSON(ctx, http.MethodGet, c.prefix+"/v1/certificates", nil, bearerToken, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// VerifyCrlSignature verifies a signed CRL using the CA public key.
+func VerifyCrlSignature(crl *NipCaCrl, caPublicKey string) bool {
+	entries := make([]any, 0, len(crl.Entries))
+	for _, entry := range crl.Entries {
+		item := map[string]any{
+			"nid":    entry.NID,
+			"serial": entry.Serial,
+		}
+		if entry.RevokedAt != "" {
+			item["revoked_at"] = entry.RevokedAt
+		}
+		if entry.Reason != "" {
+			item["reason"] = entry.Reason
+		}
+		entries = append(entries, item)
+	}
+	body := core.FrameDict{
+		"issued_by": crl.IssuedBy,
+		"issued_at": crl.IssuedAt,
+		"entries":   entries,
+	}
+	return VerifyWithPubKeyStr(body, caPublicKey, crl.Signature)
 }
 
 func (c *NipCaClient) RegisterAgent(ctx context.Context, req NipCaRegisterRequest, bearerToken string) (*NipCaIdentFrame, error) {

@@ -65,70 +65,108 @@ const (
 	ErrReservedTypeUnsupported = "NWP-RESERVED-TYPE-UNSUPPORTED"
 
 	// HTTP binding / advertised capability
-	ErrHttpOriginForbidden                  = "NWP-HTTP-ORIGIN-FORBIDDEN"
-	ErrHttpContentTypeUnsupported           = "NWP-HTTP-CONTENT-TYPE-UNSUPPORTED"
-	ErrHttpAcceptUnsatisfiable              = "NWP-HTTP-ACCEPT-UNSATISFIABLE"
-	ErrHttpRequestIdMismatch                = "NWP-HTTP-REQUEST-ID-MISMATCH"
-	ErrHttpFrameBodyMalformed               = "NWP-HTTP-FRAME-BODY-MALFORMED"
-	ErrCapabilityAdvertisedUnimplemented    = "NWP-CAPABILITY-ADVERTISED-UNIMPLEMENTED"
+	ErrHttpOriginForbidden               = "NWP-HTTP-ORIGIN-FORBIDDEN"
+	ErrHttpContentTypeUnsupported        = "NWP-HTTP-CONTENT-TYPE-UNSUPPORTED"
+	ErrHttpAcceptUnsatisfiable           = "NWP-HTTP-ACCEPT-UNSATISFIABLE"
+	ErrHttpRequestIdMismatch             = "NWP-HTTP-REQUEST-ID-MISMATCH"
+	ErrHttpFrameBodyMalformed            = "NWP-HTTP-FRAME-BODY-MALFORMED"
+	ErrHttpBodyTooLarge                  = "NWP-HTTP-BODY-TOO-LARGE"
+	ErrCapabilityAdvertisedUnimplemented = "NWP-CAPABILITY-ADVERTISED-UNIMPLEMENTED"
 
 	// Topology (NPS-CR-0002)
 	ErrTopologyUnauthorized      = "NWP-TOPOLOGY-UNAUTHORIZED"
 	ErrTopologyUnsupportedScope  = "NWP-TOPOLOGY-UNSUPPORTED-SCOPE"
 	ErrTopologyDepthUnsupported  = "NWP-TOPOLOGY-DEPTH-UNSUPPORTED"
 	ErrTopologyFilterUnsupported = "NWP-TOPOLOGY-FILTER-UNSUPPORTED"
+
+	// Multi-Anchor HA (NPS-CR-0009, NWP v0.18 §12.2).
+	//
+	// Note the deliberate asymmetry with NDP cluster resolution: at the epoch
+	// fence only a STRICTLY GREATER inbound epoch is an error, while at NDP
+	// resolution an EQUAL top epoch across two live members is the fault.
+	ErrAnchorNotLeader   = "NWP-ANCHOR-NOT-LEADER"
+	ErrAnchorEpochFenced = "NWP-ANCHOR-EPOCH-FENCED"
+
+	// Bridge Node (NPS-CR-0001 outbound, NPS-CR-0010 inbound).
+	//
+	// Statuses invented by the pre-CR-0010 implementations and REMOVED by
+	// CR-0010 must never be reintroduced here: NPS-SERVER-NOT-IMPLEMENTED,
+	// NPS-SERVER-ERROR, NPS-CLIENT-UNAUTHORIZED, NPS-CLIENT-BAD-REQUEST,
+	// NPS-SERVER-UPSTREAM-FAILED are not NPS status codes.
+	ErrBridgeDirectionUnsupported = "NWP-BRIDGE-DIRECTION-UNSUPPORTED" // both directions
+	ErrBridgeTargetInvalid        = "NWP-BRIDGE-TARGET-INVALID"        // outbound
+	ErrBridgeProtocolUnsupported  = "NWP-BRIDGE-PROTOCOL-UNSUPPORTED"  // outbound
+	ErrBridgeEndpointInvalid      = "NWP-BRIDGE-ENDPOINT-INVALID"      // outbound
+	ErrBridgeUpstreamFailed       = "NWP-BRIDGE-UPSTREAM-FAILED"       // outbound
+	ErrBridgeServerToolNotFound   = "NWP-BRIDGE-SERVER-TOOL-NOT-FOUND" // inbound
+	// ErrBridgeServerDispatcherMissing is a DEPLOYMENT fault (the Bridge was
+	// started without a backend for the node it fronts), not a client fault.
+	ErrBridgeServerDispatcherMissing = "NWP-BRIDGE-SERVER-DISPATCHER-MISSING" // inbound
+	ErrBridgeServerDispatchFailed    = "NWP-BRIDGE-SERVER-DISPATCH-FAILED"    // inbound
 )
 
 // NwpErrorToNpsStatus maps each NWP error code to its NPS status code.
 var NwpErrorToNpsStatus = map[string]string{
-	ErrAuthNidScopeViolation:      core.NpsAuthForbidden,
-	ErrAuthNidExpired:             core.NpsAuthUnauthenticated,
-	ErrAuthNidRevoked:             core.NpsAuthUnauthenticated,
-	ErrAuthNidUntrustedIssuer:     core.NpsAuthUnauthenticated,
-	ErrAuthNidCapabilityMissing:   core.NpsAuthForbidden,
-	ErrAuthAssuranceTooLow:        core.NpsAuthForbidden,
-	ErrAuthReputationBlocked:      core.NpsAuthForbidden,
-	ErrReputationThrottled:        core.NpsClientRateLimited,
-	ErrReputationRejected:         core.NpsAuthForbidden,
-	ErrReputationBanned:           core.NpsAuthForbidden,
-	ErrQueryFilterInvalid:         core.NpsClientBadParam,
-	ErrQueryFieldUnknown:          core.NpsClientBadParam,
-	ErrQueryCursorInvalid:         core.NpsClientBadParam,
-	ErrQueryRegexUnsafe:           core.NpsClientBadParam,
-	ErrQueryVectorUnsupported:     core.NpsServerUnsupported,
-	ErrQueryAggregateUnsupported:  core.NpsServerUnsupported,
-	ErrQueryAggregateInvalid:      core.NpsClientBadParam,
-	ErrQueryStreamUnsupported:     core.NpsServerUnsupported,
-	ErrActionNotFound:             core.NpsClientNotFound,
-	ErrActionParamsInvalid:        core.NpsClientUnprocessable,
-	ErrActionIdempotencyConflict:  core.NpsClientConflict,
-	ErrTaskNotFound:               core.NpsClientNotFound,
-	ErrTaskAlreadyCancelled:       core.NpsClientConflict,
-	ErrTaskAlreadyCompleted:       core.NpsClientConflict,
-	ErrTaskAlreadyFailed:          core.NpsClientConflict,
-	ErrSubscribeStreamNotFound:    core.NpsClientNotFound,
-	ErrSubscribeLimitExceeded:     core.NpsLimitExceeded,
-	ErrSubscribeFilterUnsupported: core.NpsServerUnsupported,
-	ErrSubscribeInterrupted:       core.NpsServerUnavailable,
-	ErrSubscribeSeqTooOld:         core.NpsClientConflict,
-	ErrBudgetExceeded:             core.NpsLimitBudget,
-	ErrCgnLimitExceeded:           core.NpsClientRequestTooLarge,
-	ErrDepthExceeded:              core.NpsClientBadParam,
-	ErrGraphCycle:                 core.NpsClientUnprocessable,
-	ErrNodeUnavailable:            core.NpsServerUnavailable,
-	ErrRateLimitExceeded:          core.NpsLimitRate,
-	ErrManifestVersionUnsupported: core.NpsClientBadParam,
-	ErrManifestNodeTypeRemoved:    core.NpsClientBadFrame,
-	ErrManifestNodeTypeUnknown:    core.NpsClientBadFrame,
-	ErrReservedTypeUnsupported:    core.NpsServerUnsupported,
-	ErrHttpOriginForbidden:        core.NpsAuthForbidden,
-	ErrHttpContentTypeUnsupported: core.NpsClientBadFrame,
-	ErrHttpAcceptUnsatisfiable:    core.NpsClientBadParam,
-	ErrHttpRequestIdMismatch:      core.NpsClientBadParam,
-	ErrHttpFrameBodyMalformed:               core.NpsClientBadFrame,
-	ErrCapabilityAdvertisedUnimplemented:   core.NpsServerUnsupported,
+	ErrAuthNidScopeViolation:             core.NpsAuthForbidden,
+	ErrAuthNidExpired:                    core.NpsAuthUnauthenticated,
+	ErrAuthNidRevoked:                    core.NpsAuthUnauthenticated,
+	ErrAuthNidUntrustedIssuer:            core.NpsAuthUnauthenticated,
+	ErrAuthNidCapabilityMissing:          core.NpsAuthForbidden,
+	ErrAuthAssuranceTooLow:               core.NpsAuthForbidden,
+	ErrAuthReputationBlocked:             core.NpsAuthForbidden,
+	ErrReputationThrottled:               core.NpsClientRateLimited,
+	ErrReputationRejected:                core.NpsAuthForbidden,
+	ErrReputationBanned:                  core.NpsAuthForbidden,
+	ErrQueryFilterInvalid:                core.NpsClientBadParam,
+	ErrQueryFieldUnknown:                 core.NpsClientBadParam,
+	ErrQueryCursorInvalid:                core.NpsClientBadParam,
+	ErrQueryRegexUnsafe:                  core.NpsClientBadParam,
+	ErrQueryVectorUnsupported:            core.NpsServerUnsupported,
+	ErrQueryAggregateUnsupported:         core.NpsServerUnsupported,
+	ErrQueryAggregateInvalid:             core.NpsClientBadParam,
+	ErrQueryStreamUnsupported:            core.NpsServerUnsupported,
+	ErrActionNotFound:                    core.NpsClientNotFound,
+	ErrActionParamsInvalid:               core.NpsClientUnprocessable,
+	ErrActionIdempotencyConflict:         core.NpsClientConflict,
+	ErrTaskNotFound:                      core.NpsClientNotFound,
+	ErrTaskAlreadyCancelled:              core.NpsClientConflict,
+	ErrTaskAlreadyCompleted:              core.NpsClientConflict,
+	ErrTaskAlreadyFailed:                 core.NpsClientConflict,
+	ErrSubscribeStreamNotFound:           core.NpsClientNotFound,
+	ErrSubscribeLimitExceeded:            core.NpsLimitExceeded,
+	ErrSubscribeFilterUnsupported:        core.NpsServerUnsupported,
+	ErrSubscribeInterrupted:              core.NpsServerUnavailable,
+	ErrSubscribeSeqTooOld:                core.NpsClientConflict,
+	ErrBudgetExceeded:                    core.NpsLimitBudget,
+	ErrCgnLimitExceeded:                  core.NpsClientRequestTooLarge,
+	ErrDepthExceeded:                     core.NpsClientBadParam,
+	ErrGraphCycle:                        core.NpsClientUnprocessable,
+	ErrNodeUnavailable:                   core.NpsServerUnavailable,
+	ErrRateLimitExceeded:                 core.NpsLimitRate,
+	ErrManifestVersionUnsupported:        core.NpsClientBadParam,
+	ErrManifestNodeTypeRemoved:           core.NpsClientBadFrame,
+	ErrManifestNodeTypeUnknown:           core.NpsClientBadFrame,
+	ErrReservedTypeUnsupported:           core.NpsServerUnsupported,
+	ErrHttpOriginForbidden:               core.NpsAuthForbidden,
+	ErrHttpContentTypeUnsupported:        core.NpsClientBadFrame,
+	ErrHttpAcceptUnsatisfiable:           core.NpsClientBadParam,
+	ErrHttpRequestIdMismatch:             core.NpsClientBadParam,
+	ErrHttpFrameBodyMalformed:            core.NpsClientBadFrame,
+	ErrHttpBodyTooLarge:                  core.NpsLimitPayload,
+	ErrCapabilityAdvertisedUnimplemented: core.NpsServerUnsupported,
 	ErrTopologyUnauthorized:              core.NpsAuthForbidden,
 	ErrTopologyUnsupportedScope:          core.NpsClientBadParam,
 	ErrTopologyDepthUnsupported:          core.NpsClientBadParam,
 	ErrTopologyFilterUnsupported:         core.NpsClientBadParam,
+	ErrAnchorNotLeader:                   core.NpsClientConflict,
+	ErrAnchorEpochFenced:                 core.NpsClientConflict,
+
+	ErrBridgeDirectionUnsupported:    core.NpsServerUnsupported,
+	ErrBridgeTargetInvalid:           core.NpsClientUnprocessable,
+	ErrBridgeProtocolUnsupported:     core.NpsServerUnsupported,
+	ErrBridgeEndpointInvalid:         core.NpsClientUnprocessable,
+	ErrBridgeUpstreamFailed:          core.NpsDownstreamUnavailable,
+	ErrBridgeServerToolNotFound:      core.NpsClientNotFound,
+	ErrBridgeServerDispatcherMissing: core.NpsServerInternal,
+	ErrBridgeServerDispatchFailed:    core.NpsServerInternal,
 }

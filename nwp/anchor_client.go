@@ -52,6 +52,16 @@ type TopologySnapshot struct {
 	ClusterSize uint32       `json:"cluster_size"`
 	Members     []MemberInfo `json:"members"`
 	Truncated   *bool        `json:"truncated,omitempty"`
+	// ClusterEpoch is the epoch under which the responding Anchor owns its cluster
+	// (NPS-CR-0009, NWP v0.18 §12.2). Absent means 1. Not signed.
+	//
+	// The wire key is declared explicitly on purpose: in the .NET reference this
+	// member carries no JSON name attribute and lands on `cluster_epoch` only via
+	// the host serializer's snake_case policy — a port trap.
+	//
+	// Per §12.2 every topology.snapshot / topology.stream response and every
+	// topology-mutating write MUST carry the current cluster_epoch.
+	ClusterEpoch *uint64 `json:"cluster_epoch,omitempty"`
 }
 
 // TopologyFilter is the optional subscriber-side filter for topology.stream

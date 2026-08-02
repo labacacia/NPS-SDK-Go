@@ -21,6 +21,16 @@ type NcpHandshakeCapsFrame struct {
 	NegotiatedEncoding *string
 	// EnabledEncodings is every encoding enabled by the negotiated policy, including extensions.
 	EnabledEncodings []string
+	// SessionVersion is the highest protocol version in the client/server overlap.
+	SessionVersion *string
+	// SupportedProtocols is the negotiated protocol intersection in client order.
+	SupportedProtocols []string
+	// MaxFramePayload is the negotiated ordinary frame payload ceiling.
+	MaxFramePayload *uint64
+	// ExtSupport reports whether both peers support extended frame headers.
+	ExtSupport *bool
+	// MaxConcurrentStreams is the negotiated concurrent stream ceiling.
+	MaxConcurrentStreams *uint64
 	// AnchorRef is an optional anchor reference for the server's first offered schema.
 	AnchorRef *string
 	// Payload is optional additional metadata (implementation-defined).
@@ -39,6 +49,21 @@ func (f *NcpHandshakeCapsFrame) ToDict() core.FrameDict {
 	}
 	if f.EnabledEncodings != nil {
 		d["enabled_encodings"] = f.EnabledEncodings
+	}
+	if f.SessionVersion != nil {
+		d["session_version"] = *f.SessionVersion
+	}
+	if f.SupportedProtocols != nil {
+		d["supported_protocols"] = f.SupportedProtocols
+	}
+	if f.MaxFramePayload != nil {
+		d["max_frame_payload"] = *f.MaxFramePayload
+	}
+	if f.ExtSupport != nil {
+		d["ext_support"] = *f.ExtSupport
+	}
+	if f.MaxConcurrentStreams != nil {
+		d["max_concurrent_streams"] = *f.MaxConcurrentStreams
 	}
 	if f.AnchorRef != nil {
 		d["anchor_ref"] = *f.AnchorRef
@@ -69,11 +94,19 @@ func NcpHandshakeCapsFrameFromDict(d core.FrameDict) *NcpHandshakeCapsFrame {
 		NodeID:             str(d, "node_id"),
 		Caps:               asStringSlice(d["caps"]),
 		NegotiatedEncoding: optStr(d, "negotiated_encoding"),
-		AnchorRef:          optStr(d, "anchor_ref"),
-		Payload:            d["payload"],
+		SessionVersion:     optStr(d, "session_version"),
+		MaxFramePayload:    optUint64Ptr(d, "max_frame_payload"),
+		ExtSupport:         optBoolPtr(d, "ext_support"),
+		MaxConcurrentStreams: optUint64Ptr(
+			d, "max_concurrent_streams"),
+		AnchorRef: optStr(d, "anchor_ref"),
+		Payload:   d["payload"],
 	}
 	if _, present := d["enabled_encodings"]; present {
 		f.EnabledEncodings = asStringSlice(d["enabled_encodings"])
+	}
+	if _, present := d["supported_protocols"]; present {
+		f.SupportedProtocols = asStringSlice(d["supported_protocols"])
 	}
 	return f
 }

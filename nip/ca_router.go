@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -61,6 +62,8 @@ func (rt *NipCaRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"public_key": rt.ca.GetCaPublicKey(), "algorithm": "ed25519"})
 	case r.Method == http.MethodGet && path == pfx+"/v1/crl":
 		rt.handleCrl(w, r)
+	case r.Method == http.MethodGet && path == pfx+"/v1/certificates":
+		rt.handleCertificates(w, r)
 	case r.Method == http.MethodPost && path == pfx+"/v1/agents/register":
 		rt.handleRegister(w, r, "agent", nil)
 	case r.Method == http.MethodPost && path == pfx+"/v1/nodes/register":
@@ -173,6 +176,23 @@ func (rt *NipCaRouter) handleCrl(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 500, map[string]any{"error_code": "NIP-CA-INTERNAL", "message": err.Error()})
 		return
 	}
+	sort.Slice(revoked, func(i, j int) bool {
+		left, right := revoked[i], revoked[j]
+		leftTime, rightTime := time.Time{}, time.Time{}
+		if left.RevokedAt != nil {
+			leftTime = *left.RevokedAt
+		}
+		if right.RevokedAt != nil {
+			rightTime = *right.RevokedAt
+		}
+		if !leftTime.Equal(rightTime) {
+			return leftTime.Before(rightTime)
+		}
+		if left.Serial != right.Serial {
+			return left.Serial < right.Serial
+		}
+		return left.Nid < right.Nid
+	})
 	entries := make([]map[string]any, 0, len(revoked))
 	for _, r := range revoked {
 		e := map[string]any{"nid": r.Nid, "serial": r.Serial}
@@ -197,6 +217,60 @@ func (rt *NipCaRouter) handleCrl(w http.ResponseWriter, _ *http.Request) {
 		"signature": sig,
 	}
 	writeJSON(w, 200, out)
+}
+
+func (rt *NipCaRouter) handleCertificates(w http.ResponseWriter, r *http.Request) {
+	if !rt.authorized(r) {
+		writeUnauthorized(w)
+		return
+	}
+	records, err := rt.ca.ListCertificates()
+	if err != nil {
+		writeJSON(w, 500, map[string]any{"error_code": "NIP-CA-INTERNAL", "message": err.Error()})
+		return
+	}
+	sort.Slice(records, func(i, j int) bool {
+		if !records[i].IssuedAt.Equal(records[j].IssuedAt) {
+			return records[i].IssuedAt.Before(records[j].IssuedAt)
+		}
+		return records[i].Serial < records[j].Serial
+	})
+	entries := make([]map[string]any, 0, len(records))
+	for _, record := range records {
+		var scope any
+		if err := json.Unmarshal([]byte(record.ScopeJson), &scope); err != nil {
+			scope = nil
+		}
+		entry := map[string]any{
+			"nid":           record.Nid,
+			"entity_type":   record.EntityType,
+			"serial":        record.Serial,
+			"pub_key":       record.PubKey,
+			"capabilities":  record.Capabilities,
+			"scope":         scope,
+			"issued_by":     record.IssuedBy,
+			"issued_at":     isoTime(record.IssuedAt),
+			"expires_at":    isoTime(record.ExpiresAt),
+			"revoked_at":    nil,
+			"revoke_reason": nil,
+			"nid_role":      nil,
+			"parent_nid":    nil,
+		}
+		if record.RevokedAt != nil {
+			entry["revoked_at"] = isoTime(*record.RevokedAt)
+		}
+		if record.RevokeReason != nil {
+			entry["revoke_reason"] = *record.RevokeReason
+		}
+		if record.NidRole != nil {
+			entry["nid_role"] = *record.NidRole
+		}
+		if record.ParentNid != nil {
+			entry["parent_nid"] = *record.ParentNid
+		}
+		entries = append(entries, entry)
+	}
+	writeJSON(w, 200, map[string]any{"entries": entries})
 }
 
 // ── Registration ────────────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/labacacia/NPS-sdk-go/core"
 	"github.com/labacacia/NPS-sdk-go/nip"
 )
 
@@ -114,6 +115,10 @@ type AnchorActionSpec struct {
 	TimeoutMsMax       int
 	RequiredCapability string
 	Async              bool
+	// TopologyWrite marks an action as a topology-mutating write, so the CR-0009
+	// leader check applies to it: a standby, or a quorum-lost owner, refuses it
+	// with NWP-ANCHOR-NOT-LEADER. Reads are unaffected.
+	TopologyWrite bool
 }
 
 type AnchorNodeOptions struct {
@@ -171,6 +176,10 @@ type AnchorNodeAppDeps struct {
 	TopologyService     AnchorTopologyService
 	ReputationEvaluator IReputationEvaluator
 	RateLimiter         AnchorRateLimiter
+	// EpochGuard, when set, applies the NPS-CR-0009 epoch fence + leader check to
+	// every request and stamps `cluster_epoch` on every topology response. A nil
+	// guard leaves the single-Anchor behaviour exactly as it was pre-CR-0009.
+	EpochGuard *AnchorEpochGuard
 }
 
 type AnchorNodeApp struct {
@@ -180,6 +189,7 @@ type AnchorNodeApp struct {
 	topology    AnchorTopologyService
 	evaluator   IReputationEvaluator
 	limiter     AnchorRateLimiter
+	epoch       *AnchorEpochGuard
 	nwmJSON     []byte
 	actionsJSON []byte
 }
@@ -193,6 +203,7 @@ func NewAnchorNodeApp(opt AnchorNodeOptions, deps AnchorNodeAppDeps) *AnchorNode
 		topology:  deps.TopologyService,
 		evaluator: deps.ReputationEvaluator,
 		limiter:   deps.RateLimiter,
+		epoch:     deps.EpochGuard,
 	}
 	if a.limiter == nil {
 		a.limiter = AllowAllRateLimiter{}
@@ -204,6 +215,51 @@ func NewAnchorNodeApp(opt AnchorNodeOptions, deps AnchorNodeAppDeps) *AnchorNode
 
 func (a *AnchorNodeApp) requireAuth() bool {
 	return a.opt.RequireAuth == nil || *a.opt.RequireAuth
+}
+
+// inboundClusterEpoch reads the `cluster_epoch` fencing token off an inbound
+// request body. Absence reads as 1 and is never an error, so a pre-CR-0009 peer
+// is unaffected.
+func inboundClusterEpoch(body map[string]any) (*uint64, string) {
+	if body == nil {
+		return nil, ""
+	}
+	sender, _ := body["anchor_nid"].(string)
+	if sender == "" {
+		sender, _ = body["sender_anchor_nid"].(string)
+	}
+	raw, ok := body["cluster_epoch"]
+	if !ok || raw == nil {
+		return nil, sender
+	}
+	var v uint64
+	switch x := raw.(type) {
+	case float64:
+		v = uint64(x)
+	case uint64:
+		v = x
+	case int64:
+		v = uint64(x)
+	case int:
+		v = uint64(x)
+	default:
+		return nil, sender
+	}
+	return &v, sender
+}
+
+// guardInbound applies the CR-0009 epoch fence and leader check; it returns
+// false when it has already written an error response.
+func (a *AnchorNodeApp) guardInbound(w http.ResponseWriter, body map[string]any, isTopologyWrite bool) bool {
+	if a.epoch == nil {
+		return true
+	}
+	inbound, sender := inboundClusterEpoch(body)
+	if perr := a.epoch.OnInboundFrame(inbound, sender, isTopologyWrite); perr != nil {
+		a.writeTopologyError(w, perr)
+		return false
+	}
+	return true
 }
 
 func isKnownRoute(sub string) bool {
@@ -282,6 +338,11 @@ func (a *AnchorNodeApp) handleQuery(w http.ResponseWriter, r *http.Request) {
 		a.writeError(w, 400, "NPS-CLIENT-BAD-REQUEST", ErrQueryFilterInvalid, err.Error(), nil, nil)
 		return
 	}
+	// CR-0009 §3.2(a): the epoch fence applies to ANY inbound frame, read or write.
+	// A snapshot is a read, so only the fence (not the leader check) can reject it.
+	if !a.guardInbound(w, body, false) {
+		return
+	}
 	if body["type"] != typeSnapshotWire {
 		t, _ := body["type"].(string)
 		msg := "Anchor /query requires a reserved type per NPS-2 §12."
@@ -310,6 +371,8 @@ func (a *AnchorNodeApp) handleQuery(w http.ResponseWriter, r *http.Request) {
 		a.writeError(w, 500, "NPS-SERVER-INTERNAL", ErrNodeUnavailable, "topology snapshot failed.", nil, nil)
 		return
 	}
+	// NWP §12.2: every topology.snapshot response MUST carry the current cluster_epoch.
+	a.epoch.StampSnapshot(snap)
 	caps := map[string]any{"anchor_ref": snapshotAnchorRef, "count": 1, "data": []any{snap}}
 	w.Header().Set("Content-Type", MimeCapsule)
 	w.Header().Set(HeaderNodeType, "anchor")
@@ -327,6 +390,10 @@ func (a *AnchorNodeApp) handleSubscribe(w http.ResponseWriter, r *http.Request) 
 	body, err := readJSON(r)
 	if err != nil {
 		a.writeError(w, 400, "NPS-CLIENT-BAD-REQUEST", ErrQueryFilterInvalid, err.Error(), nil, nil)
+		return
+	}
+	// CR-0009 §3.2(a): fence first; a standby may still serve (stale) stream reads.
+	if !a.guardInbound(w, body, false) {
 		return
 	}
 	if body["type"] != typeStreamWire {
@@ -365,10 +432,15 @@ func (a *AnchorNodeApp) handleSubscribe(w http.ResponseWriter, r *http.Request) 
 			flusher.Flush()
 		}
 	}
-	writeLine(map[string]any{
+	ack := map[string]any{
 		"kind": "ack", "stream_id": streamID, "status": "subscribed",
 		"last_seq": 0, "resumed": req.SinceVersion != nil,
-	})
+	}
+	// NWP §12.2: every topology.stream response MUST carry the current cluster_epoch.
+	if a.epoch != nil {
+		ack["cluster_epoch"] = a.epoch.OwnEpoch()
+	}
+	writeLine(ack)
 	for ev := range ch {
 		writeLine(eventToEnvelope(streamID, ev))
 		if ev.Kind == eventResyncWire {
@@ -409,6 +481,16 @@ func (a *AnchorNodeApp) handleInvoke(w http.ResponseWriter, r *http.Request) {
 		a.writeError(w, 400, "NPS-CLIENT-BAD-REQUEST", ErrActionParamsInvalid,
 			"action '"+frame.ActionID+"' does not support async execution.", nil, nil)
 		return
+	}
+
+	// CR-0009 §3.2: the epoch fence applies to every inbound frame; the leader
+	// check applies only to actions declared as topology-mutating writes.
+	if a.epoch != nil {
+		var body map[string]any
+		_ = json.Unmarshal(raw, &body)
+		if !a.guardInbound(w, body, spec.TopologyWrite) {
+			return
+		}
 	}
 
 	agentNid := r.Header.Get(HeaderAgent)
@@ -671,9 +753,11 @@ func (a *AnchorNodeApp) writeError(w http.ResponseWriter, status int, npsStatus,
 }
 
 func (a *AnchorNodeApp) writeTopologyError(w http.ResponseWriter, e *TopologyProtocolError) {
+	// The NPS status is authoritative for the HTTP status: NPS-CLIENT-CONFLICT
+	// (both CR-0009 anchor faults) must surface as 409, not 400.
 	status := 400
-	if e.NpsStatus == "NPS-AUTH-FORBIDDEN" {
-		status = 403
+	if e.NpsStatus != "" {
+		status = core.ToHttpStatus(e.NpsStatus)
 	}
 	a.writeError(w, status, e.NpsStatus, e.NwpErrorCode, e.Message, nil, nil)
 }

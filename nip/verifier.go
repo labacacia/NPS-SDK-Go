@@ -26,6 +26,11 @@ type VerifierOptions struct {
 	TrustedX509Roots []*cryptox509.Certificate
 	// MinAssuranceLevel — when non-nil, frames below this rank are rejected.
 	MinAssuranceLevel *AssuranceLevel
+	// Phase3Enforcement turns NIP v0.12 §7.5 CA-attested role/capability and
+	// OCSP-staple freshness checks into hard failures for v2-x509 frames.
+	Phase3Enforcement bool
+	// Now overrides the Phase-3 clock for deterministic tests. Zero uses time.Now.
+	Now time.Time
 
 	// ── Full NPS-3 §7 verifier (VerifyFull) extras ──────────────────────────
 
@@ -44,6 +49,9 @@ type VerifierOptions struct {
 	// OcspFailOpen — when true, OCSP transport failures pass through; the
 	// secure default is fail-closed (NIP-OCSP-UNAVAILABLE).
 	OcspFailOpen bool
+	// RevocationMode — required rejects when no source is configured.
+	// The zero value is the compatibility mode if_configured.
+	RevocationMode NipRevocationMode
 	// HTTPClient — used for OCSP; defaults to http.DefaultClient.
 	HTTPClient *http.Client
 }
@@ -99,8 +107,8 @@ type X509ChainVerifier func(
 
 // NipIdentVerifier — Phase 1 dual-trust IdentFrame verifier.
 type NipIdentVerifier struct {
-	Options       VerifierOptions
-	X509Verifier  X509ChainVerifier // optional — required only for Step 3b
+	Options      VerifierOptions
+	X509Verifier X509ChainVerifier // optional — required only for Step 3b
 }
 
 func NewNipIdentVerifier(opts VerifierOptions, x509Verifier X509ChainVerifier) *NipIdentVerifier {
@@ -157,6 +165,11 @@ func (v *NipIdentVerifier) Verify(frame *IdentFrame, issuerNid string) IdentVeri
 				code = ErrCertFormatInvalid
 			}
 			return fail(3, code, msg)
+		}
+		if v.Options.Phase3Enforcement {
+			if r := v.enforcePhase3(frame, time.Time{}); !r.Valid {
+				return r
+			}
 		}
 	}
 
@@ -232,6 +245,11 @@ func (v *NipIdentVerifier) VerifyFull(ctx context.Context, frame *IdentFrame, vc
 			}
 			return fail(3, code, msg)
 		}
+		if v.Options.Phase3Enforcement {
+			if r := v.enforcePhase3(frame, now); !r.Valid {
+				return r
+			}
+		}
 	}
 
 	// ── Step 4: Revocation ───────────────────────────────────────────────────
@@ -267,15 +285,33 @@ func (v *NipIdentVerifier) VerifyFull(ctx context.Context, frame *IdentFrame, vc
 	return IdentVerifyResult{Valid: true}
 }
 
+func (v *NipIdentVerifier) enforcePhase3(frame *IdentFrame, now time.Time) IdentVerifyResult {
+	leaf, err := DecodeCertChainLeaf(frame.CertChain)
+	if err != nil {
+		return fail(3, ErrCertFormatInvalid, fmt.Sprintf("failed to decode cert_chain[0]: %v", err))
+	}
+	when := now
+	if !v.Options.Now.IsZero() {
+		when = v.Options.Now
+	}
+	return Phase3Enforce(frame, leaf, when)
+}
+
 // checkRevocation runs the Step 4 revocation sources in .NET order:
 // local CRL → RevocationCheck callback → RevocationStore → OCSP. When none is
 // configured, revocation is a pass-through.
 func (v *NipIdentVerifier) checkRevocation(ctx context.Context, frame *IdentFrame) IdentVerifyResult {
+	policy := NewNipRevocationPolicy(v.Options.RevocationMode, v.Options.OcspFailOpen)
+
 	// Local CRL first (fast, no network).
 	if v.Options.LocalRevokedSerials != nil {
-		if _, revoked := v.Options.LocalRevokedSerials[frame.Serial]; revoked {
-			return fail(4, ErrCertRevoked,
-				fmt.Sprintf("certificate serial %s is in the local revocation list", frame.Serial))
+		_, revoked := v.Options.LocalRevokedSerials[frame.Serial]
+		outcome := NipRevocationGood
+		if revoked {
+			outcome = NipRevocationRevoked
+		}
+		if result := policy.Observe(NipRevocationLocalCrl, outcome); result != nil {
+			return *result
 		}
 	}
 
@@ -283,26 +319,39 @@ func (v *NipIdentVerifier) checkRevocation(ctx context.Context, frame *IdentFram
 		if r := v.Options.RevocationCheck(ctx, frame); r != nil && !r.Valid {
 			return *r
 		}
+		_ = policy.Observe(NipRevocationCallback, NipRevocationGood)
 	}
 
 	if v.Options.RevocationStore != nil {
 		record, err := v.Options.RevocationStore.GetBySerial(ctx, frame.Serial)
+		outcome := NipRevocationGood
 		if err != nil {
-			return fail(4, ErrOcspUnavailable,
-				fmt.Sprintf("revocation store lookup failed for serial %s: %v", frame.Serial, err))
+			outcome = NipRevocationUnavailable
 		}
 		if record != nil && record.RevokedAt != nil {
-			return fail(4, ErrCertRevoked,
-				fmt.Sprintf("certificate serial %s was revoked at %s: %s",
-					frame.Serial, record.RevokedAt.Format(time.RFC3339), ptrStr(record.RevokeReason)))
+			outcome = NipRevocationRevoked
+		}
+		if result := policy.Observe(NipRevocationCaStore, outcome); result != nil {
+			return *result
 		}
 	}
 
 	if v.Options.OcspURL != "" {
-		return v.ocspCheck(ctx, frame.NID)
+		result := v.ocspCheck(ctx, frame.NID)
+		outcome := NipRevocationGood
+		if !result.Valid {
+			if result.ErrorCode == ErrCertRevoked {
+				outcome = NipRevocationRevoked
+			} else {
+				outcome = NipRevocationUnavailable
+			}
+		}
+		if observed := policy.Observe(NipRevocationOcsp, outcome); observed != nil {
+			return *observed
+		}
 	}
 
-	return IdentVerifyResult{Valid: true} // pass-through when unconfigured
+	return policy.Complete()
 }
 
 // ocspCheck GETs {OcspURL}/{nid} and expects JSON {"valid":bool,"error_code":string}.
@@ -349,9 +398,6 @@ func (v *NipIdentVerifier) ocspCheck(ctx context.Context, nid string) IdentVerif
 }
 
 func (v *NipIdentVerifier) ocspTransportFailure(nid string, err error) IdentVerifyResult {
-	if v.Options.OcspFailOpen {
-		return IdentVerifyResult{Valid: true}
-	}
 	return fail(4, ErrOcspUnavailable, fmt.Sprintf("OCSP call failed for NID %s: %v", nid, err))
 }
 

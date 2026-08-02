@@ -28,7 +28,9 @@ const (
 	HeaderBanExpires       = "X-NWP-Ban-Expires"
 
 	// MIME types
-	MimeFrame    = "application/nwp-frame"
-	MimeCapsule  = "application/nwp-capsule"
-	MimeManifest = "application/nwp-manifest+json"
+	MimeFrame       = "application/nwp-frame"
+	MimeLegacyFrame = "application/x-nps-frame"
+	MimeCapsule     = "application/nwp-capsule"
+	MimeError       = "application/nwp-error+json"
+	MimeManifest    = "application/nwp-manifest+json"
 )

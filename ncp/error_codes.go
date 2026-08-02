@@ -23,6 +23,11 @@ const (
 	ErrEncNotNegotiated     = "NCP-ENC-NOT-NEGOTIATED"
 	ErrEncAuthFailed        = "NCP-ENC-AUTH-FAILED"
 	ErrPreambleInvalidCode  = "NCP-PREAMBLE-INVALID"
+	// RFC-0006 §6.3–§6.4 native-mode TLS binding. The failover trigger on the
+	// native path (NPS-CR-0009 §3.3): the mTLS client-certificate NID does not
+	// match the session IdentFrame NID, or a resumed TLS session's certificate
+	// NID differs from the ticket-bound NID.
+	ErrNidMismatch = "NCP-NID-MISMATCH"
 	// v0.8 keepalive
 	ErrKeepaliveTimeout     = "NCP-KEEPALIVE-TIMEOUT"
 	ErrRekeyRequired        = "NCP-REKEY-REQUIRED"
@@ -49,4 +54,5 @@ var NcpErrorToNpsStatus = map[string]string{
 	ErrPreambleInvalidCode:   core.NpsProtoPreambleInvalid,
 	ErrKeepaliveTimeout:      core.NpsServerTimeout,
 	ErrRekeyRequired:         core.NpsClientBadFrame,
+	ErrNidMismatch:           core.NpsAuthUnauthenticated,
 }

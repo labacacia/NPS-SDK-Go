@@ -39,31 +39,37 @@ const (
 	ErrAcmeChallengeFailed    = "NIP-ACME-CHALLENGE-FAILED"
 
 	// TrustFrame errors (NPS-3 §5.2).
-	ErrTrustFrameExpired              = "NIP-TRUST-FRAME-EXPIRED"
-	ErrTrustFrameGrantorRevoked       = "NIP-TRUST-FRAME-GRANTOR-REVOKED"
-	ErrTrustFrameScopeExceedsGrantor  = "NIP-TRUST-FRAME-SCOPE-EXCEEDS-GRANTOR"
-	ErrTrustFrameNodesPatternInvalid  = "NIP-TRUST-FRAME-NODES-PATTERN-INVALID"
+	ErrTrustFrameExpired             = "NIP-TRUST-FRAME-EXPIRED"
+	ErrTrustFrameGrantorRevoked      = "NIP-TRUST-FRAME-GRANTOR-REVOKED"
+	ErrTrustFrameScopeExceedsGrantor = "NIP-TRUST-FRAME-SCOPE-EXCEEDS-GRANTOR"
+	ErrTrustFrameNodesPatternInvalid = "NIP-TRUST-FRAME-NODES-PATTERN-INVALID"
 
 	// RevokeFrame errors (NPS-3 §5.3).
-	ErrRevokeFrameInvalid             = "NIP-REVOKE-FRAME-INVALID"
-	ErrRevokeFrameUnauthorizedIssuer  = "NIP-REVOKE-FRAME-UNAUTHORIZED-ISSUER"
-	ErrRevokeFrameSerialMismatch      = "NIP-REVOKE-FRAME-SERIAL-MISMATCH"
-	ErrRevokeFrameReasonUnknown       = "NIP-REVOKE-FRAME-REASON-UNKNOWN"
+	ErrRevokeFrameInvalid            = "NIP-REVOKE-FRAME-INVALID"
+	ErrRevokeFrameUnauthorizedIssuer = "NIP-REVOKE-FRAME-UNAUTHORIZED-ISSUER"
+	ErrRevokeFrameSerialMismatch     = "NIP-REVOKE-FRAME-SERIAL-MISMATCH"
+	ErrRevokeFrameReasonUnknown      = "NIP-REVOKE-FRAME-REASON-UNKNOWN"
 
 	// Reputation gossip (RFC-0004 §4.5).
 	ErrReputationGossipFork       = "NIP-REPUTATION-GOSSIP-FORK"
 	ErrReputationGossipSigInvalid = "NIP-REPUTATION-GOSSIP-SIG-INVALID"
 
 	// CA group/parent/session/JWS (NPS-CR-0003).
-	ErrCaGroupRevoked         = "NIP-CA-GROUP-REVOKED"
-	ErrCaParentNotFound       = "NIP-CA-PARENT-NOT-FOUND"
-	ErrCaParentNotGroup       = "NIP-CA-PARENT-NOT-GROUP"
+	ErrCaGroupRevoked           = "NIP-CA-GROUP-REVOKED"
+	ErrCaParentNotFound         = "NIP-CA-PARENT-NOT-FOUND"
+	ErrCaParentNotGroup         = "NIP-CA-PARENT-NOT-GROUP"
 	ErrCaSessionValidityInvalid = "NIP-CA-SESSION-VALIDITY-INVALID"
-	ErrCaJwsInvalid           = "NIP-CA-JWS-INVALID"
-	ErrCaJwsExpired           = "NIP-CA-JWS-EXPIRED"
+	ErrCaJwsInvalid             = "NIP-CA-JWS-INVALID"
+	ErrCaJwsExpired             = "NIP-CA-JWS-EXPIRED"
 
 	// Chain check (NPS-3 §7, NPS-CR-0003).
-	ErrCertParentRevoked  = "NIP-CERT-PARENT-REVOKED"
+	ErrCertParentRevoked = "NIP-CERT-PARENT-REVOKED"
+
+	// NPS-CR-0005 RA enrollment tiers.
+	ErrRaTokenInvalid    = "NIP-RA-TOKEN-INVALID"
+	ErrRaTokenExpired    = "NIP-RA-TOKEN-EXPIRED"
+	ErrRaNidNotAllowed   = "NIP-RA-NID-NOT-ALLOWED"
+	ErrRaPendingRejected = "NIP-RA-PENDING-REJECTED"
 
 	// OCSP staple.
 	ErrOcspStapleExpired = "NIP-OCSP-STAPLE-EXPIRED"
@@ -71,11 +77,10 @@ const (
 	// NIP v0.10 — node_roles.
 	ErrCertNodeRolesMismatch = "NIP-CERT-NODE-ROLES-MISMATCH"
 
-	// RA enrollment errors (NPS-CR-0005 §3).
-	ErrRaTokenInvalid    = "NIP-RA-TOKEN-INVALID"
-	ErrRaTokenExpired    = "NIP-RA-TOKEN-EXPIRED"
-	ErrRaNidNotAllowed   = "NIP-RA-NID-NOT-ALLOWED"
-	ErrRaPendingRejected = "NIP-RA-PENDING-REJECTED"
+	// NIP v0.12 §7.5 — Phase-3 enforcement. The only new code in v0.12.
+	// Note the deliberate asymmetry with its sibling ErrCertNodeRolesMismatch:
+	// this one maps to NPS-AUTH-FORBIDDEN, that one to NPS-CLIENT-BAD-FRAME.
+	ErrCertCapabilitiesExceeded = "NIP-CERT-CAPABILITIES-EXCEEDED"
 )
 
 // NipErrorToNpsStatus maps each NIP error code to its NPS status code.
@@ -127,12 +132,14 @@ var NipErrorToNpsStatus = map[string]string{
 	ErrCaJwsInvalid:             core.NpsAuthUnauthenticated,
 	ErrCaJwsExpired:             core.NpsAuthUnauthenticated,
 
-	ErrCertParentRevoked:     core.NpsAuthUnauthenticated,
-	ErrOcspStapleExpired:     core.NpsAuthUnauthenticated,
-	ErrCertNodeRolesMismatch: core.NpsAuthForbidden,
-
+	ErrCertParentRevoked: core.NpsAuthUnauthenticated,
 	ErrRaTokenInvalid:    core.NpsAuthUnauthenticated,
 	ErrRaTokenExpired:    core.NpsAuthUnauthenticated,
 	ErrRaNidNotAllowed:   core.NpsAuthForbidden,
 	ErrRaPendingRejected: core.NpsAuthForbidden,
+	ErrOcspStapleExpired: core.NpsAuthUnauthenticated,
+	// spec/error-codes.md:119 — NIP-CERT-NODE-ROLES-MISMATCH is NPS-CLIENT-BAD-FRAME.
+	ErrCertNodeRolesMismatch: core.NpsClientBadFrame,
+	// spec/error-codes.md:120 — ...while its Phase-3 sibling is NPS-AUTH-FORBIDDEN.
+	ErrCertCapabilitiesExceeded: core.NpsAuthForbidden,
 }

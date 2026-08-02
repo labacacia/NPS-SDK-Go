@@ -71,7 +71,8 @@ func (v *NdpAnnounceValidator) Validate(frame *AnnounceFrame) NdpAnnounceResult 
 	}
 
 	unsigned := frame.UnsignedDict()
-	if nip.VerifyWithPubKeyStr(unsigned, pubKey, frame.Signature) {
+	if VerifyAnnounceSignature(frame.ToDict(), pubKey, frame.Signature) ||
+		nip.VerifyWithPubKeyStr(unsigned, pubKey, frame.Signature) {
 		return resultOK()
 	}
 	return resultFail(ErrAnnounceSignatureInvalid, "signature verification failed")

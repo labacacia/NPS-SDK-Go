@@ -44,7 +44,7 @@ type ReputationRule struct {
 type ReputationOutcome int
 
 const (
-	RepAccept   ReputationOutcome = iota
+	RepAccept ReputationOutcome = iota
 	RepThrottle
 	RepReject
 	RepBan
@@ -70,13 +70,21 @@ var assuranceOrder = []string{"anonymous", "attested", "verified"}
 
 func severityIndex(s string) int {
 	s = strings.ToLower(s)
-	for i, v := range severityOrder { if v == s { return i } }
+	for i, v := range severityOrder {
+		if v == s {
+			return i
+		}
+	}
 	return -1
 }
 
 func assuranceIndex(s string) int {
 	s = strings.ToLower(s)
-	for i, v := range assuranceOrder { if v == s { return i } }
+	for i, v := range assuranceOrder {
+		if v == s {
+			return i
+		}
+	}
 	return -1
 }
 
@@ -102,10 +110,10 @@ func DefaultReputationEvaluator() IReputationEvaluator {
 }
 
 type reputationEvaluator struct {
-	banMu   sync.RWMutex
-	banMap  map[string]banEntry
-	logMu   sync.RWMutex
-	logMap  map[string]cacheEntry
+	banMu  sync.RWMutex
+	banMap map[string]banEntry
+	logMu  sync.RWMutex
+	logMap map[string]cacheEntry
 }
 
 func (e *reputationEvaluator) Evaluate(ctx context.Context, nid, assurance string, p ReputationPolicy) (ReputationDecision, error) {
@@ -150,20 +158,27 @@ func (e *reputationEvaluator) Evaluate(ctx context.Context, nid, assurance strin
 }
 
 func (e *reputationEvaluator) ClearBan(nid string) {
-	e.banMu.Lock(); defer e.banMu.Unlock()
+	e.banMu.Lock()
+	defer e.banMu.Unlock()
 	delete(e.banMap, nid)
 }
 
 func (e *reputationEvaluator) isBanned(nid string) bool {
-	e.banMu.RLock(); defer e.banMu.RUnlock()
-	if e.banMap == nil { return false }
+	e.banMu.RLock()
+	defer e.banMu.RUnlock()
+	if e.banMap == nil {
+		return false
+	}
 	b, ok := e.banMap[nid]
 	return ok && b.expiresAt.After(time.Now())
 }
 
 func (e *reputationEvaluator) setBan(nid string, exp time.Time) {
-	e.banMu.Lock(); defer e.banMu.Unlock()
-	if e.banMap == nil { e.banMap = make(map[string]banEntry) }
+	e.banMu.Lock()
+	defer e.banMu.Unlock()
+	if e.banMap == nil {
+		e.banMap = make(map[string]banEntry)
+	}
 	e.banMap[nid] = banEntry{expiresAt: exp}
 }
 
@@ -197,7 +212,9 @@ func (e *reputationEvaluator) fetchEntries(ctx context.Context, nid string, p Re
 		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			if resp != nil { resp.Body.Close() }
+			if resp != nil {
+				resp.Body.Close()
+			}
 			continue
 		}
 		body, _ := io.ReadAll(resp.Body)
@@ -215,7 +232,9 @@ func (e *reputationEvaluator) fetchEntries(ctx context.Context, nid string, p Re
 
 	if p.CacheTtlSeconds > 0 {
 		e.logMu.Lock()
-		if e.logMap == nil { e.logMap = make(map[string]cacheEntry) }
+		if e.logMap == nil {
+			e.logMap = make(map[string]cacheEntry)
+		}
 		e.logMap[nid] = cacheEntry{
 			expiresAt: time.Now().Add(time.Duration(p.CacheTtlSeconds) * time.Second),
 			entries:   entries,
@@ -235,14 +254,24 @@ func ruleMatches(rule *ReputationRule, entries []logEntry) bool {
 	}
 	op, threshold := parseSeverityPredicate(rule.Severity)
 	count := rule.Count
-	if count == 0 { count = 1 }
+	if count == 0 {
+		count = 1
+	}
 	var matched uint
 	for _, e := range entries {
-		if cutoff != nil && e.Timestamp.Before(*cutoff) { continue }
-		if !incidentMatches(rule.Incident, e.Incident) { continue }
-		if !severityMatches(op, threshold, e.Severity) { continue }
+		if cutoff != nil && e.Timestamp.Before(*cutoff) {
+			continue
+		}
+		if !incidentMatches(rule.Incident, e.Incident) {
+			continue
+		}
+		if !severityMatches(op, threshold, e.Severity) {
+			continue
+		}
 		matched++
-		if matched >= count { return true }
+		if matched >= count {
+			return true
+		}
 	}
 	return false
 }
@@ -253,12 +282,18 @@ func incidentMatches(pattern, incident string) bool {
 
 func severityMatches(op string, threshold int, actual string) bool {
 	idx := severityIndex(actual)
-	if idx < 0 { return false }
-	if op == ">=" { return idx >= threshold }
+	if idx < 0 {
+		return false
+	}
+	if op == ">=" {
+		return idx >= threshold
+	}
 	return idx == threshold
 }
 
 func parseSeverityPredicate(s string) (op string, threshold int) {
-	if strings.HasPrefix(s, ">=") { return ">=", severityIndex(s[2:]) }
+	if strings.HasPrefix(s, ">=") {
+		return ">=", severityIndex(s[2:])
+	}
 	return "=", severityIndex(s)
 }

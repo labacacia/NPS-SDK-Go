@@ -34,14 +34,14 @@ const (
 
 // ActionSpec is an NWM action registry entry (NPS-2 §4.6).
 type ActionSpec struct {
-	Description        string  `json:"description,omitempty"`
-	ParamsAnchor       string  `json:"params_anchor,omitempty"`
-	ResultAnchor       string  `json:"result_anchor,omitempty"`
-	Async              bool    `json:"async"`
-	Idempotent         *bool   `json:"idempotent,omitempty"`
-	TimeoutMsDefault   uint    `json:"timeout_ms_default,omitempty"`
-	TimeoutMsMax       uint    `json:"timeout_ms_max,omitempty"`
-	RequiredCapability string  `json:"required_capability,omitempty"`
+	Description        string `json:"description,omitempty"`
+	ParamsAnchor       string `json:"params_anchor,omitempty"`
+	ResultAnchor       string `json:"result_anchor,omitempty"`
+	Async              bool   `json:"async"`
+	Idempotent         *bool  `json:"idempotent,omitempty"`
+	TimeoutMsDefault   uint   `json:"timeout_ms_default,omitempty"`
+	TimeoutMsMax       uint   `json:"timeout_ms_max,omitempty"`
+	RequiredCapability string `json:"required_capability,omitempty"`
 }
 
 // ── Options ───────────────────────────────────────────────────────────────────
@@ -307,7 +307,7 @@ func (c *InMemoryIdempotencyCache) now() time.Time {
 }
 
 func idemKey(actionID, idempotencyKey string) string {
-	return actionID + "" + idempotencyKey
+	return actionID + "\x1f" + idempotencyKey
 }
 
 func (c *InMemoryIdempotencyCache) Get(actionID, idempotencyKey string) *IdempotentEntry {

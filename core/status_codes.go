@@ -10,11 +10,11 @@ const (
 	NpsOkNoContent = "NPS-OK-NO-CONTENT"
 
 	// Client errors
-	NpsClientBadFrame     = "NPS-CLIENT-BAD-FRAME"
-	NpsClientBadParam     = "NPS-CLIENT-BAD-PARAM"
-	NpsClientNotFound     = "NPS-CLIENT-NOT-FOUND"
-	NpsClientConflict     = "NPS-CLIENT-CONFLICT"
-	NpsClientGone         = "NPS-CLIENT-GONE"
+	NpsClientBadFrame      = "NPS-CLIENT-BAD-FRAME"
+	NpsClientBadParam      = "NPS-CLIENT-BAD-PARAM"
+	NpsClientNotFound      = "NPS-CLIENT-NOT-FOUND"
+	NpsClientConflict      = "NPS-CLIENT-CONFLICT"
+	NpsClientGone          = "NPS-CLIENT-GONE"
 	NpsClientUnprocessable = "NPS-CLIENT-UNPROCESSABLE"
 
 	// Auth errors
@@ -27,17 +27,17 @@ const (
 	NpsLimitPayload = "NPS-LIMIT-PAYLOAD"
 
 	// Server errors
-	NpsServerInternal           = "NPS-SERVER-INTERNAL"
-	NpsServerUnsupported        = "NPS-SERVER-UNSUPPORTED"
-	NpsServerUnavailable        = "NPS-SERVER-UNAVAILABLE"
-	NpsServerTimeout            = "NPS-SERVER-TIMEOUT"
+	NpsServerInternal            = "NPS-SERVER-INTERNAL"
+	NpsServerUnsupported         = "NPS-SERVER-UNSUPPORTED"
+	NpsServerUnavailable         = "NPS-SERVER-UNAVAILABLE"
+	NpsServerTimeout             = "NPS-SERVER-TIMEOUT"
 	NpsServerEncodingUnsupported = "NPS-SERVER-ENCODING-UNSUPPORTED"
-	NpsDownstreamUnavailable    = "NPS-DOWNSTREAM-UNAVAILABLE"
+	NpsDownstreamUnavailable     = "NPS-DOWNSTREAM-UNAVAILABLE"
 
 	// Stream errors
-	NpsStreamSeqGap  = "NPS-STREAM-SEQ-GAP"
+	NpsStreamSeqGap   = "NPS-STREAM-SEQ-GAP"
 	NpsStreamNotFound = "NPS-STREAM-NOT-FOUND"
-	NpsStreamLimit   = "NPS-STREAM-LIMIT"
+	NpsStreamLimit    = "NPS-STREAM-LIMIT"
 
 	// Protocol-level errors
 	NpsProtoVersionIncompatible = "NPS-PROTO-VERSION-INCOMPATIBLE"
@@ -78,9 +78,9 @@ var HttpStatusMap = map[string]int{
 	NpsServerEncodingUnsupported: 415,
 	NpsDownstreamUnavailable:     502,
 
-	NpsStreamSeqGap:  422,
+	NpsStreamSeqGap:   422,
 	NpsStreamNotFound: 404,
-	NpsStreamLimit:   429,
+	NpsStreamLimit:    429,
 
 	NpsProtoVersionIncompatible: 426,
 	NpsProtoPreambleInvalid:     400,

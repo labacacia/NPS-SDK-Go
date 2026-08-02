@@ -38,13 +38,13 @@ type MemoryNodeSchema struct {
 
 // MemoryNodeOptions configures a single Memory Node instance.
 type MemoryNodeOptions struct {
-	NodeID       string
-	DisplayName  string
-	Schema       MemoryNodeSchema
-	PathPrefix   string
-	DefaultLimit uint64
-	MaxLimit     uint64
-	RequireAuth  bool
+	NodeID             string
+	DisplayName        string
+	Schema             MemoryNodeSchema
+	PathPrefix         string
+	DefaultLimit       uint64
+	MaxLimit           uint64
+	RequireAuth        bool
 	DefaultTokenBudget uint64
 	// CgnLimit is the node-operator server-side CGN cap (token-budget.md §7).
 	// effective_budget = min(CgnLimit, X-NWP-Budget); 0 = no operator cap.
@@ -90,8 +90,12 @@ type MemoryNodeServer struct {
 
 // NewMemoryNodeServer creates a MemoryNodeServer and pre-computes static payloads.
 func NewMemoryNodeServer(provider IMemoryNodeProvider, opts MemoryNodeOptions) *MemoryNodeServer {
-	if opts.DefaultLimit == 0 { opts.DefaultLimit = 20 }
-	if opts.MaxLimit     == 0 { opts.MaxLimit     = 1000 }
+	if opts.DefaultLimit == 0 {
+		opts.DefaultLimit = 20
+	}
+	if opts.MaxLimit == 0 {
+		opts.MaxLimit = 1000
+	}
 	prefix := strings.TrimRight(opts.PathPrefix, "/")
 
 	anchorID, schemaJSON, nwmJSON := buildStaticPayloads(opts, prefix)
@@ -115,7 +119,9 @@ func (s *MemoryNodeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sub := path[len(s.prefix):]
-	if sub == "" { sub = "/" }
+	if sub == "" {
+		sub = "/"
+	}
 
 	// Auth check
 	if s.opts.RequireAuth && r.Header.Get("X-NWP-Agent") == "" {
@@ -144,7 +150,9 @@ func (s *MemoryNodeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	norm := strings.TrimRight(sub, "/")
-	if norm == "" { norm = "/" }
+	if norm == "" {
+		norm = "/"
+	}
 
 	switch {
 	case norm == "/.nwm" && r.Method == http.MethodGet:
@@ -160,11 +168,17 @@ func (s *MemoryNodeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write(s.schemaJSON) //nolint:errcheck
 
 	case norm == "/query":
-		if r.Method != http.MethodPost { w.WriteHeader(405); return }
+		if r.Method != http.MethodPost {
+			w.WriteHeader(405)
+			return
+		}
 		s.handleQuery(w, r)
 
 	case norm == "/stream":
-		if r.Method != http.MethodPost { w.WriteHeader(405); return }
+		if r.Method != http.MethodPost {
+			w.WriteHeader(405)
+			return
+		}
 		s.handleStream(w, r)
 
 	default:
@@ -236,7 +250,9 @@ func (s *MemoryNodeServer) handleStream(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(200)
 
 	flush := func() {
-		if f, ok := w.(http.Flusher); ok { f.Flush() }
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 	}
 
 	writeChunk := func(seq int, isLast bool, anchorRef string, data []MemoryNodeRow) {
@@ -247,7 +263,9 @@ func (s *MemoryNodeServer) handleStream(w http.ResponseWriter, r *http.Request) 
 			"is_last":   isLast,
 			"data":      data,
 		}
-		if anchorRef != "" { chunk["anchor_ref"] = anchorRef }
+		if anchorRef != "" {
+			chunk["anchor_ref"] = anchorRef
+		}
 		b, _ := json.Marshal(chunk)
 		w.Write(append(b, '\n')) //nolint:errcheck
 		flush()
@@ -259,7 +277,9 @@ func (s *MemoryNodeServer) handleStream(w http.ResponseWriter, r *http.Request) 
 		seq := 0
 		for page := range pagesCh {
 			anchorRef := ""
-			if seq == 0 { anchorRef = s.anchorID }
+			if seq == 0 {
+				anchorRef = s.anchorID
+			}
 			writeChunk(seq, false, anchorRef, page)
 			seq++
 		}
@@ -340,9 +360,15 @@ func writeError(w http.ResponseWriter, status int, npsStatus, code, message stri
 
 func queryFrameFromJSON(d map[string]any, opts MemoryNodeOptions) *QueryFrame {
 	f := &QueryFrame{}
-	if v, ok := d["anchor_ref"].(string); ok { f.AnchorRef = v }
-	if v := d["filter"]; v != nil            { f.Filter = v }
-	if v := d["order"]; v != nil             { f.Order = v }
+	if v, ok := d["anchor_ref"].(string); ok {
+		f.AnchorRef = v
+	}
+	if v := d["filter"]; v != nil {
+		f.Filter = v
+	}
+	if v := d["order"]; v != nil {
+		f.Order = v
+	}
 	switch x := d["limit"].(type) {
 	case float64:
 		v := uint64(math.Min(x, float64(opts.MaxLimit)))
@@ -352,13 +378,18 @@ func queryFrameFromJSON(d map[string]any, opts MemoryNodeOptions) *QueryFrame {
 		v := opts.DefaultLimit
 		f.Limit = &v
 	}
-	if x, ok := d["offset"].(float64); ok { v := uint64(x); f.Offset = &v }
+	if x, ok := d["offset"].(float64); ok {
+		v := uint64(x)
+		f.Offset = &v
+	}
 	return f
 }
 
 func parseBudget(r *http.Request) int {
 	raw := r.Header.Get("X-NWP-Budget")
-	if raw == "" { return 0 }
+	if raw == "" {
+		return 0
+	}
 	var n int
 	fmt.Sscanf(raw, "%d", &n)
 	return n
@@ -366,9 +397,15 @@ func parseBudget(r *http.Request) int {
 
 // effectiveBudget returns min(cgnLimit, agentBudget), treating 0 as unlimited.
 func effectiveBudget(agentBudget, cgnLimit int) int {
-	if cgnLimit == 0 { return agentBudget }
-	if agentBudget == 0 { return cgnLimit }
-	if cgnLimit < agentBudget { return cgnLimit }
+	if cgnLimit == 0 {
+		return agentBudget
+	}
+	if agentBudget == 0 {
+		return cgnLimit
+	}
+	if cgnLimit < agentBudget {
+		return cgnLimit
+	}
 	return agentBudget
 }
 
@@ -383,7 +420,9 @@ func trimToBudget(rows []MemoryNodeRow, budget int) ([]MemoryNodeRow, int) {
 	for _, row := range rows {
 		b, _ := json.Marshal(row)
 		tok := int(math.Ceil(float64(len(b)) / 4))
-		if acc+tok > budget { break }
+		if acc+tok > budget {
+			break
+		}
 		trimmed = append(trimmed, row)
 		acc += tok
 	}
