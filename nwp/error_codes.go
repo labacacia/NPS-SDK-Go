@@ -31,9 +31,16 @@ const (
 	ErrQueryStreamUnsupported    = "NWP-QUERY-STREAM-UNSUPPORTED"
 
 	// Action errors
-	ErrActionNotFound            = "NWP-ACTION-NOT-FOUND"
-	ErrActionParamsInvalid       = "NWP-ACTION-PARAMS-INVALID"
-	ErrActionIdempotencyConflict = "NWP-ACTION-IDEMPOTENCY-CONFLICT"
+	ErrActionNotFound                 = "NWP-ACTION-NOT-FOUND"
+	ErrActionParamsInvalid            = "NWP-ACTION-PARAMS-INVALID"
+	ErrActionIdempotencyConflict      = "NWP-ACTION-IDEMPOTENCY-CONFLICT"
+	ErrLlmContextNotFound             = "NWP-LLM-CONTEXT-NOT-FOUND"
+	ErrLlmContextExpired              = "NWP-LLM-CONTEXT-EXPIRED"
+	ErrLlmContextVersionConflict      = "NWP-LLM-CONTEXT-VERSION-CONFLICT"
+	ErrLlmContextBindingMismatch      = "NWP-LLM-CONTEXT-BINDING-MISMATCH"
+	ErrLlmContextForbidden            = "NWP-LLM-CONTEXT-FORBIDDEN"
+	ErrLlmContextLimitExceeded        = "NWP-LLM-CONTEXT-LIMIT-EXCEEDED"
+	ErrLlmContextOperationUnsupported = "NWP-LLM-CONTEXT-OPERATION-UNSUPPORTED"
 
 	// Task errors
 	ErrTaskNotFound         = "NWP-TASK-NOT-FOUND"
@@ -128,6 +135,13 @@ var NwpErrorToNpsStatus = map[string]string{
 	ErrActionNotFound:                    core.NpsClientNotFound,
 	ErrActionParamsInvalid:               core.NpsClientUnprocessable,
 	ErrActionIdempotencyConflict:         core.NpsClientConflict,
+	ErrLlmContextNotFound:                core.NpsClientNotFound,
+	ErrLlmContextExpired:                 core.NpsClientGone,
+	ErrLlmContextVersionConflict:         core.NpsClientConflict,
+	ErrLlmContextBindingMismatch:         core.NpsClientConflict,
+	ErrLlmContextForbidden:               core.NpsAuthForbidden,
+	ErrLlmContextLimitExceeded:           core.NpsLimitResource,
+	ErrLlmContextOperationUnsupported:    core.NpsServerUnsupported,
 	ErrTaskNotFound:                      core.NpsClientNotFound,
 	ErrTaskAlreadyCancelled:              core.NpsClientConflict,
 	ErrTaskAlreadyCompleted:              core.NpsClientConflict,

@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/labacacia/NPS-sdk-go/core"
 )
 
 // Reserved action ids handled by the Action Node server itself (NPS-2 §7.3).
@@ -70,6 +72,8 @@ type ActionNodeOptions struct {
 	RejectPrivateCallbackURLs *bool
 	// DefaultTokenBudget applies when X-NWP-Budget is absent. 0 = unlimited.
 	DefaultTokenBudget uint
+	// Profiles are protocol-specific capability profiles advertised in NWM.
+	Profiles map[string]any
 }
 
 func (o ActionNodeOptions) rejectPrivateCallbacks() bool {
@@ -103,6 +107,22 @@ type ActionContext struct {
 type IActionNodeProvider interface {
 	Execute(ctx context.Context, frame *ActionFrame, actx ActionContext) (*ActionExecutionResult, error)
 }
+
+// IActionNodeAuthorizer is an optional admission hook. It runs before
+// idempotency lookup so cached replay cannot bypass current authorization.
+type IActionNodeAuthorizer interface {
+	Authorize(ctx context.Context, frame *ActionFrame, actx ActionContext) error
+}
+
+// ActionExecutionError lets providers return a canonical NWP error envelope.
+type ActionExecutionError struct {
+	HTTPStatus int
+	NpsStatus  string
+	ErrorCode  string
+	Message    string
+}
+
+func (e *ActionExecutionError) Error() string { return e.Message }
 
 // ── Task store ────────────────────────────────────────────────────────────────
 
@@ -437,6 +457,8 @@ type ActionNodeServer struct {
 	prefix      string
 	nwmJSON     []byte
 	actionsJSON []byte
+	cancelMu    sync.Mutex
+	taskCancels map[string]context.CancelFunc
 	// Clock is a test override; defaults to time.Now().UTC.
 	Clock func() time.Time
 }
@@ -462,6 +484,7 @@ func NewActionNodeServer(provider IActionNodeProvider, opts ActionNodeOptions, t
 		taskStore:   taskStore,
 		idempotency: idempotency,
 		prefix:      strings.TrimRight(opts.PathPrefix, "/"),
+		taskCancels: map[string]context.CancelFunc{},
 	}
 	s.nwmJSON, s.actionsJSON = s.buildStaticPayloads()
 	return s
@@ -532,11 +555,11 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 
 	// Reserved actions are handled by the server itself.
 	if frame.ActionID == SystemTaskStatus {
-		s.handleSystemTaskStatus(w, &frame)
+		s.handleSystemTaskStatus(w, &frame, r.Header.Get(HeaderAgent))
 		return
 	}
 	if frame.ActionID == SystemTaskCancel {
-		s.handleSystemTaskCancel(w, &frame)
+		s.handleSystemTaskCancel(w, &frame, r.Header.Get(HeaderAgent))
 		return
 	}
 
@@ -568,9 +591,27 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	agentNid := r.Header.Get(HeaderAgent)
+	priority := frame.Priority
+	if priority == "" {
+		priority = "normal"
+	}
+	pf := frame.toActionFrame()
+	admissionCtx := ActionContext{
+		AgentNid: agentNid, RequestID: frame.RequestID, Spec: spec,
+		TimeoutMs: effectiveTimeout, Priority: priority,
+	}
+	if authorizer, ok := s.provider.(IActionNodeAuthorizer); ok {
+		if err := authorizer.Authorize(r.Context(), pf, admissionCtx); err != nil {
+			s.writeExecutionError(w, err, "action authorization failed.")
+			return
+		}
+	}
+
+	cacheActionID := s.scopedCacheActionID(frame.ActionID, agentNid)
 	paramsHash := hashParams(frame.Params)
 	if frame.IdempotencyKey != "" {
-		cached := s.idempotency.Get(frame.ActionID, frame.IdempotencyKey)
+		cached := s.idempotency.Get(cacheActionID, frame.IdempotencyKey)
 		if cached != nil {
 			if cached.ParamsHash != paramsHash {
 				s.writeError(w, 409, "NPS-CLIENT-CONFLICT", ErrActionIdempotencyConflict,
@@ -590,20 +631,12 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	agentNid := r.Header.Get(HeaderAgent)
-	priority := frame.Priority
-	if priority == "" {
-		priority = "normal"
-	}
-
-	pf := frame.toActionFrame()
-
 	if frame.Async {
 		taskID := randomHex(16)
 		s.taskStore.Create(taskID, frame.ActionID, frame.RequestID, agentNid)
 
 		if frame.IdempotencyKey != "" {
-			s.idempotency.TryStore(frame.ActionID, frame.IdempotencyKey, IdempotentEntry{
+			s.idempotency.TryStore(cacheActionID, frame.IdempotencyKey, IdempotentEntry{
 				ActionID:   frame.ActionID,
 				ParamsHash: paramsHash,
 				TaskID:     taskID,
@@ -619,7 +652,9 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 			TimeoutMs: effectiveTimeout,
 			Priority:  priority,
 		}
-		go s.runAsyncTask(pf, runCtx, effectiveTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(effectiveTimeout)*time.Millisecond)
+		s.registerTaskCancel(taskID, cancel)
+		go s.runAsyncTask(ctx, cancel, pf, runCtx)
 
 		var est *uint
 		if spec.TimeoutMsDefault > 0 {
@@ -640,13 +675,13 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(effectiveTimeout)*time.Millisecond)
 	defer cancel()
 
-	result, herr := s.provider.Execute(ctx, pf, syncCtx)
+	result, herr := s.executeWithContext(ctx, pf, syncCtx)
 	if herr != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			s.writeError(w, 504, "NPS-SERVER-TIMEOUT", ErrNodeUnavailable, "action execution timed out.", nil)
 			return
 		}
-		s.writeError(w, 500, "NPS-SERVER-INTERNAL", ErrNodeUnavailable, "action execution failed.", nil)
+		s.writeExecutionError(w, herr, "action execution failed.")
 		return
 	}
 	if result == nil {
@@ -659,7 +694,7 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if frame.IdempotencyKey != "" {
-		s.idempotency.TryStore(frame.ActionID, frame.IdempotencyKey, IdempotentEntry{
+		s.idempotency.TryStore(cacheActionID, frame.IdempotencyKey, IdempotentEntry{
 			ActionID:   frame.ActionID,
 			ParamsHash: paramsHash,
 			Result:     result.Result,
@@ -671,18 +706,32 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 	s.writeCaps(w, result.Result, anchorRef, frame.RequestID, result.TokenEst)
 }
 
-func (s *ActionNodeServer) runAsyncTask(frame *ActionFrame, runCtx ActionContext, timeoutMs uint) {
-	s.taskStore.TryTransition(runCtx.TaskID, "pending", "running")
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+func (s *ActionNodeServer) runAsyncTask(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	frame *ActionFrame,
+	runCtx ActionContext,
+) {
 	defer cancel()
+	defer s.unregisterTaskCancel(runCtx.TaskID)
+	if !s.taskStore.TryTransition(runCtx.TaskID, "pending", "running") {
+		return
+	}
 
-	res, err := s.provider.Execute(ctx, frame, runCtx)
+	res, err := s.executeWithContext(ctx, frame, runCtx)
 	if err != nil {
 		msg := err.Error()
 		if ctx.Err() == context.DeadlineExceeded {
 			msg = "task timed out"
 		}
-		errPayload, _ := json.Marshal(map[string]any{"code": ErrNodeUnavailable, "message": msg})
+		if rec := s.taskStore.Get(runCtx.TaskID); rec != nil && rec.Status == "cancelled" {
+			return
+		}
+		code := ErrNodeUnavailable
+		if execErr, ok := err.(*ActionExecutionError); ok {
+			code = execErr.ErrorCode
+		}
+		errPayload, _ := json.Marshal(map[string]any{"code": code, "message": msg})
 		s.taskStore.Fail(runCtx.TaskID, errPayload)
 		return
 	}
@@ -692,9 +741,32 @@ func (s *ActionNodeServer) runAsyncTask(frame *ActionFrame, runCtx ActionContext
 	s.taskStore.Complete(runCtx.TaskID, res.Result)
 }
 
+type actionExecutionOutcome struct {
+	result *ActionExecutionResult
+	err    error
+}
+
+func (s *ActionNodeServer) executeWithContext(
+	ctx context.Context,
+	frame *ActionFrame,
+	actionContext ActionContext,
+) (*ActionExecutionResult, error) {
+	outcome := make(chan actionExecutionOutcome, 1)
+	go func() {
+		result, err := s.provider.Execute(ctx, frame, actionContext)
+		outcome <- actionExecutionOutcome{result: result, err: err}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case completed := <-outcome:
+		return completed.result, completed.err
+	}
+}
+
 // ── Reserved actions ────────────────────────────────────────────────────────
 
-func (s *ActionNodeServer) handleSystemTaskStatus(w http.ResponseWriter, frame *ActionFrameWire) {
+func (s *ActionNodeServer) handleSystemTaskStatus(w http.ResponseWriter, frame *ActionFrameWire, agentNid string) {
 	taskID := readStringParam(frame.Params, "task_id")
 	if taskID == "" {
 		s.writeError(w, 400, "NPS-CLIENT-BAD-REQUEST", ErrActionParamsInvalid, "params.task_id is required.", nil)
@@ -703,6 +775,11 @@ func (s *ActionNodeServer) handleSystemTaskStatus(w http.ResponseWriter, frame *
 	rec := s.taskStore.Get(taskID)
 	if rec == nil {
 		s.writeError(w, 404, "NPS-CLIENT-NOT-FOUND", ErrTaskNotFound, "Unknown task_id '"+taskID+"'.", nil)
+		return
+	}
+	if rec.AgentNid != agentNid {
+		s.writeError(w, 403, core.NpsAuthForbidden, ErrAuthNidScopeViolation,
+			"The caller does not own this task.", nil)
 		return
 	}
 	status := map[string]any{
@@ -727,7 +804,7 @@ func (s *ActionNodeServer) handleSystemTaskStatus(w http.ResponseWriter, frame *
 	s.writeCaps(w, payload, "", frame.RequestID, 0)
 }
 
-func (s *ActionNodeServer) handleSystemTaskCancel(w http.ResponseWriter, frame *ActionFrameWire) {
+func (s *ActionNodeServer) handleSystemTaskCancel(w http.ResponseWriter, frame *ActionFrameWire, agentNid string) {
 	taskID := readStringParam(frame.Params, "task_id")
 	if taskID == "" {
 		s.writeError(w, 400, "NPS-CLIENT-BAD-REQUEST", ErrActionParamsInvalid, "params.task_id is required.", nil)
@@ -738,12 +815,18 @@ func (s *ActionNodeServer) handleSystemTaskCancel(w http.ResponseWriter, frame *
 		s.writeError(w, 404, "NPS-CLIENT-NOT-FOUND", ErrTaskNotFound, "Unknown task_id '"+taskID+"'.", nil)
 		return
 	}
+	if rec.AgentNid != agentNid {
+		s.writeError(w, 403, core.NpsAuthForbidden, ErrAuthNidScopeViolation,
+			"The caller does not own this task.", nil)
+		return
+	}
 	if isTerminal(rec.Status) {
 		s.writeError(w, 409, "NPS-CLIENT-CONFLICT", ErrTaskAlreadyCancelled,
 			"Task '"+taskID+"' is already in a terminal state ('"+rec.Status+"').", nil)
 		return
 	}
 	s.taskStore.Cancel(taskID)
+	s.cancelTask(taskID)
 	payload, _ := json.Marshal(map[string]any{"task_id": taskID, "status": "cancelled"})
 	s.writeCaps(w, payload, "", frame.RequestID, 0)
 }
@@ -776,6 +859,31 @@ func (s *ActionNodeServer) clampTimeout(requested uint, spec ActionSpec) uint {
 		return hardMax
 	}
 	return requested
+}
+
+func (s *ActionNodeServer) scopedCacheActionID(actionID, agentNid string) string {
+	return s.opts.NodeID + "\x1f" + actionID + "\x1f" + agentNid
+}
+
+func (s *ActionNodeServer) registerTaskCancel(taskID string, cancel context.CancelFunc) {
+	s.cancelMu.Lock()
+	defer s.cancelMu.Unlock()
+	s.taskCancels[taskID] = cancel
+}
+
+func (s *ActionNodeServer) unregisterTaskCancel(taskID string) {
+	s.cancelMu.Lock()
+	defer s.cancelMu.Unlock()
+	delete(s.taskCancels, taskID)
+}
+
+func (s *ActionNodeServer) cancelTask(taskID string) {
+	s.cancelMu.Lock()
+	cancel := s.taskCancels[taskID]
+	s.cancelMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
 }
 
 func hashParams(p json.RawMessage) string {
@@ -868,6 +976,14 @@ func (s *ActionNodeServer) writeError(w http.ResponseWriter, status int, npsStat
 	_ = json.NewEncoder(w).Encode(env)
 }
 
+func (s *ActionNodeServer) writeExecutionError(w http.ResponseWriter, err error, fallback string) {
+	if execErr, ok := err.(*ActionExecutionError); ok {
+		s.writeError(w, execErr.HTTPStatus, execErr.NpsStatus, execErr.ErrorCode, execErr.Message, nil)
+		return
+	}
+	s.writeError(w, 500, core.NpsServerInternal, ErrNodeUnavailable, fallback, nil)
+}
+
 func (s *ActionNodeServer) buildStaticPayloads() (nwmJSON, actionsJSON []byte) {
 	base := s.prefix
 	auth := map[string]any{"required": s.opts.RequireAuth, "identity_type": "none"}
@@ -886,6 +1002,9 @@ func (s *ActionNodeServer) buildStaticPayloads() (nwmJSON, actionsJSON []byte) {
 	}
 	if s.opts.DisplayName != "" {
 		nwm["display_name"] = s.opts.DisplayName
+	}
+	if s.opts.Profiles != nil {
+		nwm["profiles"] = s.opts.Profiles
 	}
 	nwmJSON, _ = json.Marshal(nwm)
 	actionsJSON, _ = json.Marshal(map[string]any{"actions": s.opts.Actions})
@@ -914,6 +1033,16 @@ func (f *ActionFrameWire) toActionFrame() *ActionFrame {
 		if err := json.Unmarshal(f.Params, &v); err == nil {
 			af.Params = v
 		}
+	}
+	if f.IdempotencyKey != "" {
+		af.IdempotencyKey = stringPtr(f.IdempotencyKey)
+	}
+	if f.TimeoutMs != 0 {
+		value := uint32(f.TimeoutMs)
+		af.TimeoutMs = &value
+	}
+	if f.RequestID != "" {
+		af.RequestID = stringPtr(f.RequestID)
 	}
 	return af
 }

@@ -72,16 +72,21 @@ func (s *NwpNativeNodeServer) Dispatch(ctx context.Context, ft core.FrameType, d
 		if s.QueryHandler == nil {
 			return core.FrameTypeError, nativeError("NPS-SERVER-INTERNAL", "NWP-NATIVE-DISPATCH-FAILED", "No native NWP query handler configured.")
 		}
-		caps, err := s.QueryHandler(ctx, QueryFrameFromDict(dict))
+		query := QueryFrameFromDict(dict)
+		caps, err := s.QueryHandler(ctx, query)
 		if err != nil {
 			return core.FrameTypeError, nativeError("NPS-SERVER-INTERNAL", "NWP-NATIVE-DISPATCH-FAILED", err.Error())
+		}
+		if query.RequestID != nil {
+			caps.RequestID = query.RequestID
 		}
 		return core.FrameTypeCaps, caps.ToDict()
 	case core.FrameTypeAction:
 		if s.ActionHandler == nil {
 			return core.FrameTypeError, nativeError("NPS-SERVER-INTERNAL", "NWP-NATIVE-DISPATCH-FAILED", "No native NWP action handler configured.")
 		}
-		result, err := s.ActionHandler(ctx, ActionFrameFromDict(dict))
+		action := ActionFrameFromDict(dict)
+		result, err := s.ActionHandler(ctx, action)
 		if err != nil {
 			return core.FrameTypeError, nativeError("NPS-SERVER-INTERNAL", "NWP-NATIVE-DISPATCH-FAILED", err.Error())
 		}
@@ -94,6 +99,9 @@ func (s *NwpNativeNodeServer) Dispatch(ctx context.Context, ft core.FrameType, d
 		caps.TokenEst = &tok
 		tokenizer := "native-estimate"
 		caps.TokenizerUsed = &tokenizer
+		if action.RequestID != nil {
+			caps.RequestID = action.RequestID
+		}
 		return core.FrameTypeCaps, caps.ToDict()
 	default:
 		return core.FrameTypeError, nativeError(

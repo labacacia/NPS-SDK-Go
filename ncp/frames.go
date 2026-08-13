@@ -155,6 +155,7 @@ type CapsFrame struct {
 	TokenEst      *uint64
 	Cached        *bool
 	TokenizerUsed *string
+	RequestID     *string
 	Payload       any
 }
 
@@ -190,6 +191,9 @@ func (f *CapsFrame) ToDict() core.FrameDict {
 	if f.TokenizerUsed != nil {
 		d["tokenizer_used"] = *f.TokenizerUsed
 	}
+	if f.RequestID != nil {
+		d["request_id"] = *f.RequestID
+	}
 	if f.Payload != nil {
 		d["payload"] = f.Payload
 	}
@@ -218,6 +222,7 @@ func CapsFrameFromDict(d core.FrameDict) *CapsFrame {
 		TokenEst:      optUint64Ptr(d, "token_est"),
 		Cached:        optBoolPtr(d, "cached"),
 		TokenizerUsed: optStr(d, "tokenizer_used"),
+		RequestID:     optStr(d, "request_id"),
 		Payload:       d["payload"],
 	}
 }

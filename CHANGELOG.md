@@ -8,6 +8,30 @@ Until NPS reaches v1.0 stable, every repository in the suite is synchronized to 
 
 ---
 
+## [1.0.0-alpha.18] — Unreleased
+
+### Added
+
+- Added official stateful LLM context DTOs, a mutex-protected process store, and a net/http Action Server coordinator with owner scoping, CAS reservations, lifecycle actions, true asynchronous execution, cancellation, and all 19 shared conformance vectors.
+
+### Changed
+
+- Aligned unary request correlation, LLM usage accounting, strict stateful request validation, task ownership, and cancellation-safe reservation aborts across SDK families.
+- Documented and enforced the Go 1.23 minimum language baseline while retaining a security-current build toolchain.
+
+## [1.0.0-alpha.17] — 2026-08-02
+
+### Added
+
+- Port the reference server surface into the Go SDK: NCP native transport, NWP action/complex/memory nodes and bidirectional bridges, NIP CA services and full verification, NOP orchestration, daemon observability, and telemetry.
+- Implement the shared NCP 0.11, NWP 0.20, NIP 0.13, NDP 0.12, and NOP 0.9
+  portable profiles and language-neutral conformance fixtures.
+
+### Changed
+
+- Require Go 1.26.5 or newer so release builds include the current standard-library security fixes.
+- Apply canonical `gofmt` formatting across the SDK.
+
 ## [1.0.0-alpha.16] — 2026-07-23
 
 ### Changed

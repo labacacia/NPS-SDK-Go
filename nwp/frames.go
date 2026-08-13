@@ -250,10 +250,13 @@ func stringSlice(v any) []string {
 // ── ActionFrame ───────────────────────────────────────────────────────────────
 
 type ActionFrame struct {
-	Action    string
-	Params    any
-	AnchorRef *string
-	Async     bool
+	Action         string
+	Params         any
+	AnchorRef      *string
+	Async          bool
+	IdempotencyKey *string
+	TimeoutMs      *uint32
+	RequestID      *string
 }
 
 func (f *ActionFrame) FrameType() core.FrameType { return core.FrameTypeAction }
@@ -266,6 +269,15 @@ func (f *ActionFrame) ToDict() core.FrameDict {
 	if f.AnchorRef != nil {
 		d["anchor_ref"] = *f.AnchorRef
 	}
+	if f.RequestID != nil {
+		d["request_id"] = *f.RequestID
+	}
+	if f.IdempotencyKey != nil {
+		d["idempotency_key"] = *f.IdempotencyKey
+	}
+	if f.TimeoutMs != nil {
+		d["timeout_ms"] = *f.TimeoutMs
+	}
 	return d
 }
 
@@ -275,10 +287,13 @@ func ActionFrameFromDict(d core.FrameDict) *ActionFrame {
 		action = str(d, "action")
 	}
 	return &ActionFrame{
-		Action:    action,
-		Params:    d["params"],
-		AnchorRef: optStr(d, "anchor_ref"),
-		Async:     optBool(d, "async"),
+		Action:         action,
+		Params:         d["params"],
+		AnchorRef:      optStr(d, "anchor_ref"),
+		Async:          optBool(d, "async"),
+		IdempotencyKey: optStr(d, "idempotency_key"),
+		TimeoutMs:      optUint32(d, "timeout_ms"),
+		RequestID:      optStr(d, "request_id"),
 	}
 }
 

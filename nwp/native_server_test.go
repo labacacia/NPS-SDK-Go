@@ -35,7 +35,8 @@ func TestNativeServerDispatchWireQuery(t *testing.T) {
 	server.QueryHandler = func(_ context.Context, _ *nwp.QueryFrame) (*ncp.CapsFrame, error) {
 		return ncp.NewCapsFrame("native:test", []any{map[string]any{"id": 42}}), nil
 	}
-	wire, err := codec.Encode(core.FrameTypeQuery, (&nwp.QueryFrame{AnchorRef: "sha256:a"}).ToDict(), core.EncodingTierMsgPack, true)
+	requestID := "req-query-1"
+	wire, err := codec.Encode(core.FrameTypeQuery, (&nwp.QueryFrame{AnchorRef: "sha256:a", RequestID: &requestID}).ToDict(), core.EncodingTierMsgPack, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,6 +54,9 @@ func TestNativeServerDispatchWireQuery(t *testing.T) {
 	caps := ncp.CapsFrameFromDict(dict)
 	if caps.Count != 1 {
 		t.Fatalf("count = %d", caps.Count)
+	}
+	if caps.RequestID == nil || *caps.RequestID != requestID {
+		t.Fatalf("request_id = %v", caps.RequestID)
 	}
 }
 
@@ -89,7 +93,8 @@ func TestNativeServerDispatchWireAcceptsActionID(t *testing.T) {
 	server.ActionHandler = func(_ context.Context, frame *nwp.ActionFrame) (any, error) {
 		return map[string]any{"action": frame.Action}, nil
 	}
-	wire, err := codec.Encode(core.FrameTypeAction, core.FrameDict{"action_id": "ping"}, core.EncodingTierMsgPack, true)
+	requestID := "req-action-1"
+	wire, err := codec.Encode(core.FrameTypeAction, core.FrameDict{"action_id": "ping", "request_id": requestID}, core.EncodingTierMsgPack, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,6 +109,9 @@ func TestNativeServerDispatchWireAcceptsActionID(t *testing.T) {
 	caps := ncp.CapsFrameFromDict(dict)
 	if caps.Data[0].(map[string]any)["action"] != "ping" {
 		t.Fatalf("unexpected caps data: %+v", caps.Data)
+	}
+	if caps.RequestID == nil || *caps.RequestID != requestID {
+		t.Fatalf("request_id = %v", caps.RequestID)
 	}
 }
 

@@ -22,9 +22,10 @@ const (
 	NpsAuthForbidden       = "NPS-AUTH-FORBIDDEN"
 
 	// Limit errors
-	NpsLimitRate    = "NPS-LIMIT-RATE"
-	NpsLimitBudget  = "NPS-LIMIT-BUDGET"
-	NpsLimitPayload = "NPS-LIMIT-PAYLOAD"
+	NpsLimitRate     = "NPS-LIMIT-RATE"
+	NpsLimitBudget   = "NPS-LIMIT-BUDGET"
+	NpsLimitPayload  = "NPS-LIMIT-PAYLOAD"
+	NpsLimitResource = "NPS-LIMIT-RESOURCE"
 
 	// Server errors
 	NpsServerInternal            = "NPS-SERVER-INTERNAL"
@@ -67,9 +68,10 @@ var HttpStatusMap = map[string]int{
 	NpsAuthUnauthenticated: 401,
 	NpsAuthForbidden:       403,
 
-	NpsLimitRate:    429,
-	NpsLimitBudget:  429,
-	NpsLimitPayload: 413,
+	NpsLimitRate:     429,
+	NpsLimitBudget:   429,
+	NpsLimitPayload:  413,
+	NpsLimitResource: 429,
 
 	NpsServerInternal:            500,
 	NpsServerUnsupported:         501,

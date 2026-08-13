@@ -8,8 +8,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/labacacia/NPS-sdk-go/core"
 )
 
 const (
@@ -37,6 +40,35 @@ func (p echoProvider) Execute(ctx context.Context, frame *ActionFrame, actx Acti
 		"agent":    actx.AgentNid,
 	})
 	return &ActionExecutionResult{Result: payload, AnchorRef: actx.Spec.ResultAnchor, TokenEst: 10}, nil
+}
+
+type authorizingProvider struct {
+	mu         sync.Mutex
+	admissions int
+	calls      int
+	revoke     bool
+}
+
+func (p *authorizingProvider) Authorize(context.Context, *ActionFrame, ActionContext) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.admissions++
+	if p.revoke && p.admissions > 1 {
+		return &ActionExecutionError{
+			HTTPStatus: 401, NpsStatus: core.NpsAuthUnauthenticated,
+			ErrorCode: ErrAuthNidRevoked, Message: "revoked",
+		}
+	}
+	return nil
+}
+
+func (p *authorizingProvider) Execute(_ context.Context, _ *ActionFrame, actx ActionContext) (*ActionExecutionResult, error) {
+	p.mu.Lock()
+	p.calls++
+	call := p.calls
+	p.mu.Unlock()
+	payload, _ := json.Marshal(map[string]any{"call": call, "owner": actx.AgentNid})
+	return &ActionExecutionResult{Result: payload}, nil
 }
 
 func anBaseOpts() ActionNodeOptions {
@@ -266,6 +298,74 @@ func TestActionNodeIdempotencyAsyncRehit(t *testing.T) {
 	if t1 != t2 {
 		t.Fatalf("async rehit should return same task handle: %s vs %s", t1, t2)
 	}
+}
+
+func TestActionNodeIdempotencyCallerScopeAndReplayAuthorization(t *testing.T) {
+	provider := &authorizingProvider{}
+	srv := httptest.NewServer(NewActionNodeServer(provider, anBaseOpts(), nil, nil))
+	defer srv.Close()
+	body := map[string]any{"action_id": "orders.peek", "idempotency_key": "shared", "params": map[string]any{"x": 1}}
+	alice := anPost(t, srv, body, nil)
+	if alice.StatusCode != 200 {
+		t.Fatalf("alice status %d", alice.StatusCode)
+	}
+	anDecode(t, alice)
+	bob := anPost(t, srv, body, map[string]string{HeaderAgent: "urn:nps:agent:bob"})
+	if bob.StatusCode != 200 {
+		t.Fatalf("bob status %d", bob.StatusCode)
+	}
+	bobData := anDecode(t, bob)["data"].([]any)[0].(map[string]any)
+	if bobData["owner"] != "urn:nps:agent:bob" || provider.calls != 2 {
+		t.Fatalf("caller-scoped replay failed: data=%+v calls=%d", bobData, provider.calls)
+	}
+
+	provider.revoke = true
+	replay := anPost(t, srv, body, nil)
+	if replay.StatusCode != 401 || anDecode(t, replay)["error"] != ErrAuthNidRevoked {
+		t.Fatal("cached replay must be reauthorized")
+	}
+}
+
+func TestActionNodeTaskOwnershipAndCancellationPropagation(t *testing.T) {
+	started := make(chan struct{})
+	cancelled := make(chan struct{})
+	provider := actionProviderFunc(func(ctx context.Context, _ *ActionFrame, _ ActionContext) (*ActionExecutionResult, error) {
+		close(started)
+		<-ctx.Done()
+		close(cancelled)
+		return nil, ctx.Err()
+	})
+	srv := httptest.NewServer(NewActionNodeServer(provider, anBaseOpts(), nil, nil))
+	defer srv.Close()
+	accepted := anPost(t, srv, map[string]any{"action_id": "orders.create", "async": true}, nil)
+	taskID := anDecode(t, accepted)["task_id"].(string)
+	<-started
+
+	for _, action := range []string{SystemTaskStatus, SystemTaskCancel} {
+		response := anPost(t, srv, map[string]any{
+			"action_id": action, "params": map[string]any{"task_id": taskID},
+		}, map[string]string{HeaderAgent: "urn:nps:agent:bob"})
+		if response.StatusCode != 403 || anDecode(t, response)["error"] != ErrAuthNidScopeViolation {
+			t.Fatalf("%s must be owner scoped", action)
+		}
+	}
+	cancel := anPost(t, srv, map[string]any{
+		"action_id": SystemTaskCancel, "params": map[string]any{"task_id": taskID},
+	}, nil)
+	if cancel.StatusCode != 200 {
+		t.Fatalf("cancel status %d", cancel.StatusCode)
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("provider context was not cancelled")
+	}
+}
+
+type actionProviderFunc func(context.Context, *ActionFrame, ActionContext) (*ActionExecutionResult, error)
+
+func (f actionProviderFunc) Execute(ctx context.Context, frame *ActionFrame, actx ActionContext) (*ActionExecutionResult, error) {
+	return f(ctx, frame, actx)
 }
 
 func TestActionNodeSyncTimeout(t *testing.T) {

@@ -1,22 +1,22 @@
 [English Version](./README.md) | 中文版
 
-# NPS Go SDK v1.0.0-alpha.16
+# NPS Go SDK v1.0.0-alpha.18
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
-[![Release](https://img.shields.io/badge/release-v1.0.0--alpha.16-orange.svg)](../../CHANGELOG.cn.md)
-[![NCP](https://img.shields.io/badge/NCP-v0.9-5b8cff.svg)]()
-[![NWP](https://img.shields.io/badge/NWP-v0.14-4af0b0.svg)]()
-[![NIP](https://img.shields.io/badge/NIP-v0.10-7b61ff.svg)]()
-[![NDP](https://img.shields.io/badge/NDP-v0.9-f0a050.svg)]()
-[![NOP](https://img.shields.io/badge/NOP-v0.7-ff8c42.svg)]()
+[![Candidate](https://img.shields.io/badge/candidate-v1.0.0--alpha.17-blue.svg)](../../CHANGELOG.cn.md)
+[![NCP](https://img.shields.io/badge/NCP-v0.11-5b8cff.svg)]()
+[![NWP](https://img.shields.io/badge/NWP-v0.20-4af0b0.svg)]()
+[![NIP](https://img.shields.io/badge/NIP-v0.13-7b61ff.svg)]()
+[![NDP](https://img.shields.io/badge/NDP-v0.12-f0a050.svg)]()
+[![NOP](https://img.shields.io/badge/NOP-v0.9-ff8c42.svg)]()
 
 Neural Protocol Suite (NPS) 的 Go 参考实现 —— 覆盖五个子协议：**NCP · NWP · NIP · NDP · NOP**，外加完整的 NPS-RFC-0002 X.509 + ACME `agent-01` NID 证书原语。
 
 | | |
 |---|---|
 | **Module** | `github.com/labacacia/NPS-sdk-go` |
-| **Go** | 1.25+ |
-| **测试** | 86 通过 |
+| **Go** | 1.26.5+ |
+| **测试** | 完整测试与 Alpha.17 共享 fixture 通过 |
 | **许可证** | Apache 2.0 |
 
 Alpha.14 候选新增：远程 NIP CA 类型化客户端（`nip.NipCaClient`）、native-mode NWP 服务端 helper（`nwp.NwpNativeNodeServer`）和 TC-N1/TC-N2 一致性 manifest helper（`conformance`）。
@@ -36,18 +36,20 @@ Alpha.14 候选新增：远程 NIP CA 类型化客户端（`nip.NipCaClient`）�
 | `ndp` | NDP | AnnounceFrame、ResolveFrame、GraphFrame、InMemoryNdpRegistry、NdpAnnounceValidator |
 | `nop` | NOP | TaskFrame、DelegateFrame、SyncFrame、AlignStreamFrame、NopClient |
 | `conformance` | CI / 认证 | TC-N1/TC-N2 一致性用例目录、manifest 构造器和校验器 |
+| `daemon/observability` | Runtime | 健康检查、就绪检查、指标、结构化日志与优雅停机 helper |
+| `telemetry` | Runtime | 轻量级 counter、histogram 与 span 记录 |
 
 ---
 
-## main 分支未发布内容
+## Alpha.17 可移植 Profile
 
-`main` 分支额外携带 **alpha.16 周期的服务端面 parity 移植**（尚未进入任何已发布包；随下一个套件版本发布）：
+- NCP 0.11 有界原生服务握手与确定性 Caps 协商。
+- NWP 0.20 可移植 Node/Bridge serving 与 Bridge 生命周期。
+- NIP 0.13 可移植 CA、实时吊销、签名 CRL 与验证策略。
+- NDP 0.12 签名 Announce 准入及 registry 冲突/liveness 策略。
+- NOP 0.9 确定性编排、callback 安全、委派、租约与 CR-0007 runtime 决策。
 
-- **NOP 编排引擎** —— DAG 校验器、条件求值器、输入映射、结果聚合、任务存储、Worker 客户端、回调校验、instrumentation
-- **NCP 原生模式传输** —— server、session、client、帧 IO、握手 caps、编码策略、patch 格式
-- **NIP CA 服务** —— CA router + RA 准入模型、SQL CA store、TrustFrame 校验器、完整六步 §7 `VerifyFull` 验证器
-- **NWP 服务端面**扩展（memory/complex node 服务）
-- **Daemon observability**（health / metrics / logging / shutdown）与 **telemetry**
+五个 Profile 均消费 [`spec/conformance`](../../spec/conformance/) 下的语言无关 fixture。
 
 ## 安装
 
@@ -199,10 +201,10 @@ for _, c := range cases {
 manifest := conformance.NewManifest(
     conformance.NodeL1,
     "my-node",
-    "1.0.0-alpha.16",
+    "1.0.0-alpha.18",
     "urn:nps:node:example.com:my-node",
     "labacacia-fixture",
-    "1.0.0-alpha.16",
+    "1.0.0-alpha.18",
     results,
     "ci",
 )

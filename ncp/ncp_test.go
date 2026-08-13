@@ -102,11 +102,13 @@ func TestStreamFrame_Roundtrip(t *testing.T) {
 
 func TestCapsFrame_Roundtrip(t *testing.T) {
 	ref := "sha256:abc"
+	requestID := "req-caps-1"
 	f := &ncp.CapsFrame{
 		NodeID:    "urn:nps:node:example.com:n1",
 		Caps:      []string{"nwp", "nop", "nip"},
 		AnchorRef: &ref,
 		Payload:   map[string]any{"meta": "data"},
+		RequestID: &requestID,
 	}
 	d := f.ToDict()
 	f2 := ncp.CapsFrameFromDict(d)
@@ -118,6 +120,9 @@ func TestCapsFrame_Roundtrip(t *testing.T) {
 	}
 	if f2.AnchorRef == nil || *f2.AnchorRef != ref {
 		t.Errorf("AnchorRef mismatch")
+	}
+	if f2.RequestID == nil || *f2.RequestID != requestID {
+		t.Errorf("RequestID mismatch")
 	}
 }
 
