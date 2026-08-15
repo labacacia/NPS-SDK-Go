@@ -27,12 +27,14 @@ const (
 	LlmAuthorizationCommit    LlmAuthorizationStage = "commit"
 )
 
-// LlmContextAuthorizer performs deployment-owned NIP/capability checks.
+// LlmContextAuthorizer verifies every supplied capability using deployment-owned NIP policy.
+// Stateful requests fail closed when no authorizer is configured.
 type LlmContextAuthorizer func(
 	ctx context.Context,
 	owner LlmContextOwner,
 	actionID string,
 	stage LlmAuthorizationStage,
+	requiredCapabilities []string,
 	actionContext ActionContext,
 ) error
 
@@ -43,6 +45,7 @@ type StatefulLlmActionOptions struct {
 	ProviderName        string
 	DefaultModel        string
 	SupportsTools       bool
+	SupportsStream      bool
 	SupportsJSONMode    bool
 	ReasoningVisibility string
 	Authorizer          LlmContextAuthorizer
@@ -110,7 +113,7 @@ func (p *StatefulLlmActionProvider) ConfigureNode(node *ActionNodeOptions) {
 	profile := map[string]any{
 		"profile_version": "0.2",
 		"actions":         []string{LlmCompleteActionID, LlmContextStatusActionID, LlmContextReleaseActionID},
-		"supports_stream": false, "supports_tools": p.options.SupportsTools,
+		"supports_stream": p.options.SupportsStream, "supports_tools": p.options.SupportsTools,
 		"supports_json_mode": p.options.SupportsJSONMode,
 		"context": map[string]any{
 			"supported": true, "operations": descriptor.Operations,
@@ -154,11 +157,22 @@ func (p *StatefulLlmActionProvider) Authorize(
 	if !requiresContext {
 		return nil
 	}
+	if frame.Action == LlmCompleteActionID && frame.Async {
+		request, err := decodeCompleteRequest(frame)
+		if err != nil {
+			return paramsExecutionError(err.Error())
+		}
+		if request.Stream {
+			return paramsExecutionError("stream=true cannot be combined with async=true")
+		}
+	}
 	owner, err := p.owner(actionContext)
 	if err != nil {
 		return err
 	}
-	return p.checkAuthorization(ctx, owner, frame.Action, LlmAuthorizationAdmission, actionContext)
+	return p.checkAuthorization(
+		ctx, owner, frame.Action, LlmAuthorizationAdmission,
+		requiredLlmCapabilities(frame), actionContext)
 }
 
 // Execute dispatches lifecycle actions or delegates ordinary actions to the wrapped provider.
@@ -194,9 +208,12 @@ func (p *StatefulLlmActionProvider) complete(
 	if request.Context == nil {
 		return p.inner.Execute(ctx, frame, actionContext)
 	}
-	if request.Stream {
+	if request.Stream && !p.options.SupportsStream {
 		return nil, paramsExecutionError(
-			"the Action Server context coordinator supports unary/async completion, not streaming")
+			"this node does not advertise LLM streaming support")
+	}
+	if request.Stream && frame.Async {
+		return nil, paramsExecutionError("stream=true cannot be combined with async=true")
 	}
 	if (request.Context.Operation == LlmContextAppend || request.Context.Operation == LlmContextFork ||
 		request.Context.Operation == LlmContextReset) &&
@@ -240,8 +257,25 @@ func (p *StatefulLlmActionProvider) complete(
 		return nil, ctx.Err()
 	}
 	if providerResult == nil || len(providerResult.Result) == 0 {
+		if request.Stream && providerResult != nil && providerResult.Stream != nil {
+			return &ActionExecutionResult{
+				Stream: p.coordinateStream(
+					providerResult.Stream, reservation, owner, frame, actionContext),
+				AnchorRef: LlmCompleteStreamAnchor,
+				TokenEst:  providerResult.TokenEst,
+			}, nil
+		}
 		p.abort(reservation, ErrNodeUnavailable)
+		if request.Stream {
+			return nil, internalExecutionError(
+				"stateful streaming llm.complete returned no StreamFrame sequence")
+		}
 		return nil, internalExecutionError("stateful llm.complete returned no official response object")
+	}
+	if request.Stream {
+		p.abort(reservation, ErrNodeUnavailable)
+		return nil, internalExecutionError(
+			"stateful streaming llm.complete returned a unary response")
 	}
 	var response LlmCompleteActionResponse
 	if err := json.Unmarshal(providerResult.Result, &response); err != nil || !validStopReason(response.StopReason) {
@@ -256,7 +290,10 @@ func (p *StatefulLlmActionProvider) complete(
 		response.Context = nil
 		return completionResult(response, providerResult)
 	}
-	if err := p.checkAuthorization(ctx, owner, frame.Action, LlmAuthorizationCommit, actionContext); err != nil {
+	if err := p.checkAuthorization(
+		ctx, owner, frame.Action, LlmAuthorizationCommit,
+		requiredLlmCapabilities(frame), actionContext,
+	); err != nil {
 		p.abort(reservation, executionErrorCode(err))
 		return nil, err
 	}
@@ -272,6 +309,126 @@ func (p *StatefulLlmActionProvider) complete(
 	}
 	response.Context = &receipt
 	return completionResult(response, providerResult)
+}
+
+func (p *StatefulLlmActionProvider) coordinateStream(
+	source ActionStream,
+	reservation *LlmContextMutationReservation,
+	owner LlmContextOwner,
+	requestFrame *ActionFrame,
+	actionContext ActionContext,
+) ActionStream {
+	return func(ctx context.Context, emit func(*ActionStreamFrame) error) error {
+		var content strings.Builder
+		toolCalls := make([]LlmToolCallDto, 0)
+		resolved := false
+		terminalSeen := false
+		defer func() {
+			if !resolved {
+				p.abort(reservation, ErrNodeUnavailable)
+			}
+		}()
+
+		err := source(ctx, func(frame *ActionStreamFrame) error {
+			if terminalSeen {
+				return internalExecutionError("LLM stream emitted frames after terminal")
+			}
+			if frame == nil {
+				return internalExecutionError("LLM stream emitted a nil frame")
+			}
+			chunks := make([]LlmCompleteStreamChunkDto, len(frame.Data))
+			for i, payload := range frame.Data {
+				if err := json.Unmarshal(payload, &chunks[i]); err != nil {
+					return internalExecutionError(
+						"stateful llm.complete returned an invalid stream payload: " + err.Error())
+				}
+				if !frame.IsLast && (chunks[i].StopReason != nil || chunks[i].Error != nil ||
+					chunks[i].Usage != nil || chunks[i].Context != nil) {
+					return internalExecutionError(
+						"LLM stream stop_reason, error, usage, and context are terminal-only fields")
+				}
+				if chunks[i].ContentDelta != nil {
+					content.WriteString(*chunks[i].ContentDelta)
+				}
+				toolCalls = append(toolCalls, chunks[i].ToolCalls...)
+				chunks[i].Context = nil
+			}
+			clean := *frame
+			clean.Data = marshalLlmStreamChunks(chunks)
+			if !frame.IsLast {
+				return emit(&clean)
+			}
+
+			terminalSeen = true
+			failed := frame.ErrorCode != ""
+			terminalIndex := -1
+			for i := range chunks {
+				if chunks[i].StopReason != nil {
+					terminalIndex = i
+				}
+				if chunks[i].Error != nil ||
+					(chunks[i].StopReason != nil && *chunks[i].StopReason == LlmStopError) {
+					failed = true
+				}
+			}
+			if failed {
+				code := frame.ErrorCode
+				if code == "" {
+					code = ErrNodeUnavailable
+				}
+				p.abort(reservation, code)
+				resolved = true
+				clean.ErrorCode = code
+				clean.IsLast = true
+				return emit(&clean)
+			}
+			if terminalIndex < 0 {
+				return internalExecutionError(
+					"successful LLM stream terminal frame requires stop_reason")
+			}
+			if err := p.checkAuthorization(
+				ctx, owner, requestFrame.Action, LlmAuthorizationCommit,
+				requiredLlmCapabilities(requestFrame), actionContext,
+			); err != nil {
+				p.abort(reservation, executionErrorCode(err))
+				resolved = true
+				return err
+			}
+			var assistantContent *string
+			if content.Len() > 0 {
+				value := content.String()
+				assistantContent = &value
+			}
+			receipt, err := p.store.Commit(reservation, LlmMessageDto{
+				Role: "assistant", Content: assistantContent, ToolCalls: toolCalls,
+			})
+			if err != nil {
+				p.abort(reservation, executionErrorCode(mapLlmStoreError(err)))
+				resolved = true
+				return mapLlmStoreError(err)
+			}
+			chunks[terminalIndex].Context = &receipt
+			clean.Data = marshalLlmStreamChunks(chunks)
+			resolved = true
+			return emit(&clean)
+		})
+		if err != nil {
+			return err
+		}
+		if !terminalSeen {
+			return internalExecutionError(
+				"stateful llm.complete stream ended without a terminal frame")
+		}
+		return nil
+	}
+}
+
+func marshalLlmStreamChunks(chunks []LlmCompleteStreamChunkDto) []json.RawMessage {
+	result := make([]json.RawMessage, len(chunks))
+	for i := range chunks {
+		result[i], _ = json.Marshal(chunks[i])
+	}
+	return result
 }
 
 func (p *StatefulLlmActionProvider) status(
@@ -364,12 +521,33 @@ func (p *StatefulLlmActionProvider) checkAuthorization(
 	owner LlmContextOwner,
 	actionID string,
 	stage LlmAuthorizationStage,
+	requiredCapabilities []string,
 	actionContext ActionContext,
 ) error {
 	if p.options.Authorizer == nil {
-		return nil
+		return &ActionExecutionError{
+			HTTPStatus: 403, NpsStatus: core.NpsAuthForbidden,
+			ErrorCode: ErrLlmContextForbidden,
+			Message:   "stateful LLM context authorization is not configured",
+		}
 	}
-	return p.options.Authorizer(ctx, owner, actionID, stage, actionContext)
+	return p.options.Authorizer(
+		ctx, owner, actionID, stage, append([]string(nil), requiredCapabilities...), actionContext)
+}
+
+func requiredLlmCapabilities(frame *ActionFrame) []string {
+	if frame.Action == LlmContextStatusActionID || frame.Action == LlmContextReleaseActionID {
+		return []string{CapabilityLlmContext}
+	}
+	capabilities := []string{CapabilityLlmComplete, CapabilityLlmContext}
+	params, _ := frame.Params.(map[string]any)
+	if stream, _ := params["stream"].(bool); stream {
+		capabilities = append(capabilities, CapabilityLlmStream)
+	}
+	if tools, ok := params["tools"].([]any); ok && len(tools) > 0 {
+		capabilities = append(capabilities, CapabilityLlmToolCall)
+	}
+	return capabilities
 }
 
 func (p *StatefulLlmActionProvider) abort(reservation *LlmContextMutationReservation, errorCode string) {

@@ -87,11 +87,32 @@ type ActionExecutionResult struct {
 	// Result is the action output, serialised into CapsFrame.Data (single
 	// element). Nil is allowed for side-effecting actions with no payload.
 	Result json.RawMessage
+	// Stream emits canonical NWP StreamFrames. When set, Result is ignored and
+	// the Action Server writes an NDJSON response under a server-owned stream ID.
+	Stream ActionStream
 	// AnchorRef optionally overrides ActionSpec.ResultAnchor.
 	AnchorRef string
 	// TokenEst is the approximate token count of the serialised result.
 	TokenEst uint
 }
+
+// ActionStreamFrame is the canonical NWP streaming response shape.
+type ActionStreamFrame struct {
+	StreamID   string            `json:"stream_id"`
+	Seq        uint64            `json:"seq"`
+	IsLast     bool              `json:"is_last"`
+	AnchorRef  string            `json:"anchor_ref,omitempty"`
+	Data       []json.RawMessage `json:"data"`
+	WindowSize *uint             `json:"window_size,omitempty"`
+	ErrorCode  string            `json:"error_code,omitempty"`
+}
+
+// ActionStream writes frames through emit and returns only after the stream has
+// completed or failed. Implementations must emit one terminal frame.
+type ActionStream func(
+	ctx context.Context,
+	emit func(*ActionStreamFrame) error,
+) error
 
 // ActionContext is passed to a provider Execute call.
 type ActionContext struct {
@@ -101,6 +122,8 @@ type ActionContext struct {
 	Spec      ActionSpec
 	TimeoutMs uint
 	Priority  string
+	// WireInputBytes is the exact ActionFrame payload length at the decoder boundary.
+	WireInputBytes uint64
 }
 
 // IActionNodeProvider is implemented by applications to expose actions.
@@ -289,12 +312,13 @@ func (s *InMemoryActionTaskStore) PurgeExpired(retention time.Duration, now time
 
 // IdempotentEntry is a cached idempotent response (NPS-2 §7.1).
 type IdempotentEntry struct {
-	ActionID   string
-	ParamsHash string
-	Result     json.RawMessage
-	AnchorRef  string
-	TaskID     string
-	ExpiresAt  time.Time
+	ActionID     string
+	ParamsHash   string
+	Result       json.RawMessage
+	StreamFrames []ActionStreamFrame
+	AnchorRef    string
+	TaskID       string
+	ExpiresAt    time.Time
 }
 
 // IIdempotencyCache caches idempotent action results keyed by
@@ -599,7 +623,7 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 	pf := frame.toActionFrame()
 	admissionCtx := ActionContext{
 		AgentNid: agentNid, RequestID: frame.RequestID, Spec: spec,
-		TimeoutMs: effectiveTimeout, Priority: priority,
+		TimeoutMs: effectiveTimeout, Priority: priority, WireInputBytes: uint64(len(raw)),
 	}
 	if authorizer, ok := s.provider.(IActionNodeAuthorizer); ok {
 		if err := authorizer.Authorize(r.Context(), pf, admissionCtx); err != nil {
@@ -626,6 +650,10 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 				s.writeAsyncResponse(w, cached.TaskID, status, frame.RequestID, nil)
 				return
 			}
+			if cached.StreamFrames != nil {
+				s.writeStream(w, r.Context(), replayActionStream(cached.StreamFrames), frame.RequestID)
+				return
+			}
 			s.writeCaps(w, cached.Result, cached.AnchorRef, frame.RequestID, 0)
 			return
 		}
@@ -645,12 +673,13 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 		}
 
 		runCtx := ActionContext{
-			AgentNid:  agentNid,
-			RequestID: frame.RequestID,
-			TaskID:    taskID,
-			Spec:      spec,
-			TimeoutMs: effectiveTimeout,
-			Priority:  priority,
+			AgentNid:       agentNid,
+			RequestID:      frame.RequestID,
+			TaskID:         taskID,
+			Spec:           spec,
+			TimeoutMs:      effectiveTimeout,
+			Priority:       priority,
+			WireInputBytes: uint64(len(raw)),
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(effectiveTimeout)*time.Millisecond)
 		s.registerTaskCancel(taskID, cancel)
@@ -666,11 +695,12 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 
 	// Synchronous path.
 	syncCtx := ActionContext{
-		AgentNid:  agentNid,
-		RequestID: frame.RequestID,
-		Spec:      spec,
-		TimeoutMs: effectiveTimeout,
-		Priority:  priority,
+		AgentNid:       agentNid,
+		RequestID:      frame.RequestID,
+		Spec:           spec,
+		TimeoutMs:      effectiveTimeout,
+		Priority:       priority,
+		WireInputBytes: uint64(len(raw)),
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(effectiveTimeout)*time.Millisecond)
 	defer cancel()
@@ -691,6 +721,17 @@ func (s *ActionNodeServer) handleInvoke(w http.ResponseWriter, r *http.Request) 
 	anchorRef := result.AnchorRef
 	if anchorRef == "" {
 		anchorRef = spec.ResultAnchor
+	}
+	if result.Stream != nil {
+		completed := s.writeStream(w, ctx, result.Stream, frame.RequestID)
+		if completed != nil && frame.IdempotencyKey != "" {
+			s.idempotency.TryStore(cacheActionID, frame.IdempotencyKey, IdempotentEntry{
+				ActionID: frame.ActionID, ParamsHash: paramsHash,
+				StreamFrames: completed, AnchorRef: anchorRef,
+				ExpiresAt: s.clock().Add(s.idempotencyTTL()),
+			})
+		}
+		return
 	}
 
 	if frame.IdempotencyKey != "" {
@@ -966,6 +1007,84 @@ func (s *ActionNodeServer) writeCaps(w http.ResponseWriter, payload json.RawMess
 	_ = json.NewEncoder(w).Encode(caps)
 }
 
+func (s *ActionNodeServer) writeStream(
+	w http.ResponseWriter,
+	ctx context.Context,
+	stream ActionStream,
+	requestID string,
+) []ActionStreamFrame {
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set(HeaderNodeType, "action")
+	if requestID != "" {
+		w.Header().Set(HeaderRequestID, requestID)
+	}
+	w.WriteHeader(http.StatusOK)
+
+	streamID := randomHex(16)
+	emitted := make([]ActionStreamFrame, 0)
+	var nextSeq uint64
+	terminal := false
+	emit := func(supplied *ActionStreamFrame) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if supplied == nil {
+			return internalExecutionError("action stream emitted a nil frame")
+		}
+		if terminal {
+			return internalExecutionError("action stream emitted frames after its terminal frame")
+		}
+		if supplied.Seq != nextSeq {
+			return internalExecutionError("action stream sequence is not contiguous from zero")
+		}
+		if supplied.ErrorCode != "" && !supplied.IsLast {
+			return internalExecutionError("action stream error_code is terminal-only")
+		}
+		frame := *supplied
+		frame.StreamID = streamID
+		if frame.Data == nil {
+			frame.Data = []json.RawMessage{}
+		}
+		if err := json.NewEncoder(w).Encode(frame); err != nil {
+			return err
+		}
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		emitted = append(emitted, frame)
+		nextSeq++
+		terminal = frame.IsLast
+		return nil
+	}
+
+	err := stream(ctx, emit)
+	if err == nil && !terminal {
+		err = internalExecutionError("action stream ended without a terminal frame")
+	}
+	if err != nil && !terminal && ctx.Err() == nil {
+		code := executionErrorCode(err)
+		_ = emit(&ActionStreamFrame{
+			Seq: nextSeq, IsLast: true, ErrorCode: code,
+			Data: []json.RawMessage{},
+		})
+	}
+	if err != nil || len(emitted) == 0 || emitted[len(emitted)-1].ErrorCode != "" {
+		return nil
+	}
+	return emitted
+}
+
+func replayActionStream(frames []ActionStreamFrame) ActionStream {
+	return func(ctx context.Context, emit func(*ActionStreamFrame) error) error {
+		for i := range frames {
+			if err := emit(&frames[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 func (s *ActionNodeServer) writeError(w http.ResponseWriter, status int, npsStatus, errorCode, message string, details any) {
 	env := map[string]any{"status": npsStatus, "error": errorCode, "message": message}
 	if details != nil {
@@ -996,7 +1115,7 @@ func (s *ActionNodeServer) buildStaticPayloads() (nwmJSON, actionsJSON []byte) {
 		"node_type":        "action",
 		"wire_formats":     []string{"ncp-capsule", "json"},
 		"preferred_format": "json",
-		"capabilities":     map[string]any{"query": false, "stream": false, "token_budget_hint": true},
+		"capabilities":     map[string]any{"query": false, "stream": llmProfileSupportsStream(s.opts.Profiles), "token_budget_hint": true},
 		"auth":             auth,
 		"endpoints":        map[string]any{"invoke": base + "/invoke", "schema": base + "/.schema"},
 	}
@@ -1009,6 +1128,15 @@ func (s *ActionNodeServer) buildStaticPayloads() (nwmJSON, actionsJSON []byte) {
 	nwmJSON, _ = json.Marshal(nwm)
 	actionsJSON, _ = json.Marshal(map[string]any{"actions": s.opts.Actions})
 	return
+}
+
+func llmProfileSupportsStream(profiles map[string]any) bool {
+	llm, ok := profiles["llm"].(map[string]any)
+	if !ok {
+		return false
+	}
+	supported, _ := llm["supports_stream"].(bool)
+	return supported
 }
 
 // ── ActionFrame wire type ─────────────────────────────────────────────────────

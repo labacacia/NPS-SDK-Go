@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/labacacia/NPS-sdk-go/internal/testfixture"
 )
 
 var (
@@ -81,11 +82,17 @@ func (h *contextStoreHarness) create(t *testing.T, key string, ttl *uint32) LlmC
 func TestLlmContextStoreSharedVectors(t *testing.T) {
 	var fixture struct {
 		Vectors []struct {
-			ID string `json:"id"`
+			ID       string         `json:"id"`
+			Input    map[string]any `json:"input"`
+			Expected map[string]any `json:"expected"`
 		} `json:"vectors"`
 	}
 	_, file, _, _ := runtime.Caller(0)
-	raw, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "..", "spec", "conformance", "nwp", "llm_context_vectors.json"))
+	path, err := testfixture.ConformanceFile(file, "nwp", "llm_context_vectors.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,8 +125,161 @@ func TestLlmContextStoreSharedVectors(t *testing.T) {
 		if !exists {
 			t.Fatalf("shared vector %s has no Go implementation", vector.ID)
 		}
-		t.Run(vector.ID, fn)
+		t.Run(vector.ID, func(t *testing.T) {
+			assertLlmFixtureContract(t, vector.ID, vector.Input, vector.Expected)
+			fn(t)
+		})
 	}
+}
+
+func assertLlmFixtureContract(t *testing.T, id string, input, expected map[string]any) {
+	t.Helper()
+	if len(input) == 0 || len(expected) == 0 {
+		t.Fatalf("%s must have non-empty input and expected objects", id)
+	}
+	switch id[len(id)-3:] {
+	case "001":
+		if _, exists := jmap(input, "params")["context"]; exists || jstring(expected, "mode") != "stateless" ||
+			!jbool(expected, "dispatched") || jbool(expected, "context_mutated") {
+			t.Fatal("stateless fixture contract mismatch")
+		}
+	case "002":
+		if jstring(expected, "owner_nid") != jstring(input, "owner_nid") || jnum(expected, "version") != 1 || !jbool(expected, "committed") {
+			t.Fatal("create fixture contract mismatch")
+		}
+	case "003":
+		pre, params := jmap(input, "pre_state"), jmap(input, "params")
+		if jnum(expected, "version") != jnum(pre, "version")+1 ||
+			jnum(expected, "accepted_delta_message_count") != float64(len(jarray(params, "messages"))) ||
+			jnum(expected, "post_message_count") != float64(len(jarray(pre, "messages"))+len(jarray(params, "messages"))+1) {
+			t.Fatal("append fixture contract mismatch")
+		}
+	case "004":
+		pre := jmap(input, "pre_state")
+		if jnum(expected, "post_version") != jnum(pre, "version") ||
+			jnum(jmap(expected, "hint"), "current_version") != jnum(pre, "version") ||
+			jstring(expected, "error") != ErrLlmContextVersionConflict {
+			t.Fatal("CAS fixture contract mismatch")
+		}
+	case "005":
+		if jnum(expected, "parent_version") != jnum(jmap(input, "request"), "base_version") ||
+			jnum(expected, "post_parent_version") != jnum(input, "parent_version_at_child_commit") ||
+			jnum(expected, "version") != 1 {
+			t.Fatal("fork fixture contract mismatch")
+		}
+	case "006":
+		if jnum(expected, "version") != jnum(jmap(input, "pre_state"), "version")+1 ||
+			jstring(expected, "resolved_model") != jstring(jmap(input, "request"), "model") {
+			t.Fatal("reset fixture contract mismatch")
+		}
+	case "007":
+		if jnum(expected, "post_version") != jnum(jmap(input, "pre_state"), "version") ||
+			jstring(expected, "error") != ErrLlmContextBindingMismatch ||
+			jbool(expected, "provider_dispatched") || jbool(expected, "stateless_fallback") {
+			t.Fatal("binding fixture contract mismatch")
+		}
+	case "008":
+		if jstring(input, "owner_nid") == jstring(input, "caller_nid") ||
+			containsJSON(jarray(input, "caller_capabilities"), CapabilityLlmContext) ||
+			jstring(expected, "error") != ErrLlmContextForbidden {
+			t.Fatal("owner fixture contract mismatch")
+		}
+	case "009":
+		if jnum(expected, "post_version") != jnum(jmap(input, "pre_state"), "version") ||
+			jbool(expected, "committed") || !jbool(expected, "reservation_released") {
+			t.Fatal("abort fixture contract mismatch")
+		}
+	case "010":
+		sequence := jarray(input, "status_sequence")
+		terminal := sequence[len(sequence)-1].(map[string]any)
+		completed := jmap(expected, "completed_status")
+		if jbool(jmap(expected, "running_status"), "context_id_present") ||
+			jstring(completed, "context_id") != jstring(terminal, "context_id") ||
+			jnum(completed, "version") != jnum(terminal, "version") {
+			t.Fatal("lost-create fixture contract mismatch")
+		}
+	case "011":
+		if jnum(jmap(expected, "release_receipt"), "version") != jnum(jmap(input, "pre_state"), "version")+1 ||
+			jnum(jmap(expected, "expiry_tombstone"), "version") != jnum(jmap(input, "expiry_branch"), "active_version") {
+			t.Fatal("tombstone fixture contract mismatch")
+		}
+	case "012":
+		usage := jmap(input, "usage")
+		if jnum(usage, "input_tokens") != jnum(usage, "reused_tokens")+jnum(usage, "evaluated_tokens") ||
+			jnum(usage, "wire_input_bytes") >= jnum(input, "stateless_wire_input_bytes") ||
+			!jbool(expected, "usage_equation_valid") || !jbool(expected, "wire_input_smaller_than_stateless") {
+			t.Fatal("usage fixture contract mismatch")
+		}
+	case "013":
+		manifestContext := jmap(jmap(input, "manifest"), "context")
+		if !jsonEqual(jarray(manifestContext, "operations"), jarray(input, "implemented_operations")) ||
+			jstring(manifestContext, "persistence") != jstring(input, "implemented_persistence") ||
+			!jbool(expected, "manifest_valid") || jstring(expected, "requires_capability") != CapabilityLlmContext {
+			t.Fatal("manifest fixture contract mismatch")
+		}
+	case "014":
+		if jstring(input, "persistence") != "process" || jstring(input, "event") != "process_restart" ||
+			jstring(expected, "error") != ErrLlmContextNotFound ||
+			jbool(expected, "replacement_created") || jbool(expected, "stateless_fallback") {
+			t.Fatal("restart fixture contract mismatch")
+		}
+	case "015":
+		original := jmap(input, "original")
+		if joinJSON(jarray(original, "chunks")) != jstring(expected, "ordered_content") ||
+			jstring(original, "stream_id") == jstring(input, "replay_stream_id") ||
+			jnum(expected, "provider_invocations") != 0 || jnum(expected, "additional_context_commits") != 0 {
+			t.Fatal("stream replay fixture contract mismatch")
+		}
+	case "016":
+		if jstring(input, "authorization_at_admission") != "valid" || jstring(input, "authorization_at_commit") != "revoked" ||
+			jnum(expected, "post_version") != jnum(jmap(input, "pre_state"), "version") ||
+			jstring(expected, "error") != ErrAuthNidRevoked {
+			t.Fatal("revocation fixture contract mismatch")
+		}
+	case "017":
+		if jnum(input, "live_contexts") != jnum(input, "max_contexts_per_principal") ||
+			jstring(expected, "error") != ErrLlmContextLimitExceeded || jbool(expected, "context_allocated") {
+			t.Fatal("limit fixture contract mismatch")
+		}
+	case "018":
+		if containsJSON(jarray(input, "advertised_operations"), jstring(jmap(input, "request"), "operation")) ||
+			jstring(expected, "error") != ErrLlmContextOperationUnsupported {
+			t.Fatal("unsupported-operation fixture contract mismatch")
+		}
+	case "019":
+		if jbool(input, "idempotency_key_present") || jstring(expected, "error") != ErrActionParamsInvalid ||
+			jbool(expected, "context_allocated") || jbool(expected, "provider_dispatched") {
+			t.Fatal("idempotency fixture contract mismatch")
+		}
+	default:
+		t.Fatalf("unimplemented fixture contract: %s", id)
+	}
+}
+
+func jmap(value map[string]any, key string) map[string]any { return value[key].(map[string]any) }
+func jarray(value map[string]any, key string) []any        { return value[key].([]any) }
+func jstring(value map[string]any, key string) string      { return value[key].(string) }
+func jnum(value map[string]any, key string) float64        { return value[key].(float64) }
+func jbool(value map[string]any, key string) bool          { return value[key].(bool) }
+func containsJSON(values []any, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
+}
+func joinJSON(values []any) string {
+	var result string
+	for _, value := range values {
+		result += value.(string)
+	}
+	return result
+}
+func jsonEqual(left, right any) bool {
+	a, _ := json.Marshal(left)
+	b, _ := json.Marshal(right)
+	return string(a) == string(b)
 }
 
 func TestLlmContextStoreDefensiveCopies(t *testing.T) {
