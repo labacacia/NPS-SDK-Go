@@ -3,10 +3,10 @@
 # NPS Go SDK v1.0.0-alpha.18
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
-[![Candidate](https://img.shields.io/badge/candidate-v1.0.0--alpha.17-blue.svg)](../../CHANGELOG.cn.md)
+[![Release](https://img.shields.io/badge/release-v1.0.0--alpha.18-orange.svg)](../../CHANGELOG.cn.md)
 [![NCP](https://img.shields.io/badge/NCP-v0.11-5b8cff.svg)]()
-[![NWP](https://img.shields.io/badge/NWP-v0.20-4af0b0.svg)]()
-[![NIP](https://img.shields.io/badge/NIP-v0.13-7b61ff.svg)]()
+[![NWP](https://img.shields.io/badge/NWP-v0.21-4af0b0.svg)]()
+[![NIP](https://img.shields.io/badge/NIP-v0.14-7b61ff.svg)]()
 [![NDP](https://img.shields.io/badge/NDP-v0.12-f0a050.svg)]()
 [![NOP](https://img.shields.io/badge/NOP-v0.9-ff8c42.svg)]()
 
@@ -16,7 +16,7 @@ Neural Protocol Suite (NPS) 的 Go 参考实现 —— 覆盖五个子协议：*
 |---|---|
 | **Module** | `github.com/labacacia/NPS-sdk-go` |
 | **Go** | 1.26.5+ |
-| **测试** | 完整测试与 Alpha.17 共享 fixture 通过 |
+| **测试** | 完整测试与 Alpha.18 共享 fixture 通过 |
 | **许可证** | Apache 2.0 |
 
 Alpha.14 候选新增：远程 NIP CA 类型化客户端（`nip.NipCaClient`）、native-mode NWP 服务端 helper（`nwp.NwpNativeNodeServer`）和 TC-N1/TC-N2 一致性 manifest helper（`conformance`）。
@@ -41,11 +41,11 @@ Alpha.14 候选新增：远程 NIP CA 类型化客户端（`nip.NipCaClient`）�
 
 ---
 
-## Alpha.17 可移植 Profile
+## Alpha.18 可移植 Profile
 
 - NCP 0.11 有界原生服务握手与确定性 Caps 协商。
-- NWP 0.20 可移植 Node/Bridge serving 与 Bridge 生命周期。
-- NIP 0.13 可移植 CA、实时吊销、签名 CRL 与验证策略。
+- NWP 0.21 可移植 Node/Bridge serving 与 Bridge 生命周期。
+- NIP 0.14 可移植 CA、实时吊销、签名 CRL 与验证策略。
 - NDP 0.12 签名 Announce 准入及 registry 冲突/liveness 策略。
 - NOP 0.9 确定性编排、callback 安全、委派、租约与 CR-0007 runtime 决策。
 
