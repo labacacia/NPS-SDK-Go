@@ -19,6 +19,10 @@ Go reference implementation of the Neural Protocol Suite (NPS) — covers all fi
 | **Tests** | Full suite and shared Alpha.18 fixtures passing |
 | **License** | Apache 2.0 |
 
+The canonical repository name and the published Go module intentionally use
+different casing. See [Naming and compatibility](docs/naming-and-compatibility.md)
+for the accepted module-path decision.
+
 Alpha.15 additions: typed remote NIP CA client (`nip.NipCaClient`), native-mode NWP serving helper (`nwp.NwpNativeNodeServer`), and TC-N1/TC-N2 conformance manifest helpers (`conformance`).
 
 ---

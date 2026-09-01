@@ -19,6 +19,9 @@ Neural Protocol Suite (NPS) 的 Go 参考实现 —— 覆盖五个子协议：*
 | **测试** | 完整测试与 Alpha.18 共享 fixture 通过 |
 | **许可证** | Apache 2.0 |
 
+规范仓库名与已发布 Go module 的大小写有意不同。已接受的 module path 决策见
+[命名与兼容性](docs/naming-and-compatibility.md)。
+
 Alpha.14 候选新增：远程 NIP CA 类型化客户端（`nip.NipCaClient`）、native-mode NWP 服务端 helper（`nwp.NwpNativeNodeServer`）和 TC-N1/TC-N2 一致性 manifest helper（`conformance`）。
 
 ---
