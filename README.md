@@ -1,6 +1,6 @@
 English | [中文版](./README.cn.md)
 
-# NPS Go SDK v1.0.0-alpha.18
+# NPS Go SDK v1.0.0-alpha.19
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
 [![Release](https://img.shields.io/badge/release-v1.0.0--alpha.18-orange.svg)](../../CHANGELOG.md)
@@ -211,10 +211,10 @@ for _, c := range cases {
 manifest := conformance.NewManifest(
     conformance.NodeL1,
     "my-node",
-    "1.0.0-alpha.18",
+    "1.0.0-alpha.19",
     "urn:nps:node:example.com:my-node",
     "labacacia-fixture",
-    "1.0.0-alpha.18",
+    "1.0.0-alpha.19",
     results,
     "ci",
 )
