@@ -8,6 +8,14 @@ Until NPS reaches v1.0 stable, every repository in the suite is synchronized to 
 
 ---
 
+## [Unreleased] — alpha.19 candidate
+
+### Added
+
+- Added the public compile-time `core.Version` runtime-inspection API, guarded
+  by a test and release gate that require it to match the repository `VERSION`
+  file.
+
 ## [1.0.0-alpha.18] — 2026-08-15
 
 ### Added
