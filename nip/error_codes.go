@@ -72,7 +72,9 @@ const (
 	ErrRaPendingRejected = "NIP-RA-PENDING-REJECTED"
 
 	// OCSP staple.
-	ErrOcspStapleExpired = "NIP-OCSP-STAPLE-EXPIRED"
+	ErrOcspStapleExpired    = "NIP-OCSP-STAPLE-EXPIRED"
+	ErrOcspUnknown          = "NIP-OCSP-UNKNOWN"
+	ErrRevocationStateStale = "NIP-REVOCATION-STATE-STALE"
 
 	// NIP v0.10 — node_roles.
 	ErrCertNodeRolesMismatch = "NIP-CERT-NODE-ROLES-MISMATCH"
@@ -132,12 +134,14 @@ var NipErrorToNpsStatus = map[string]string{
 	ErrCaJwsInvalid:             core.NpsAuthUnauthenticated,
 	ErrCaJwsExpired:             core.NpsAuthUnauthenticated,
 
-	ErrCertParentRevoked: core.NpsAuthUnauthenticated,
-	ErrRaTokenInvalid:    core.NpsAuthUnauthenticated,
-	ErrRaTokenExpired:    core.NpsAuthUnauthenticated,
-	ErrRaNidNotAllowed:   core.NpsAuthForbidden,
-	ErrRaPendingRejected: core.NpsAuthForbidden,
-	ErrOcspStapleExpired: core.NpsAuthUnauthenticated,
+	ErrCertParentRevoked:    core.NpsAuthUnauthenticated,
+	ErrRaTokenInvalid:       core.NpsAuthUnauthenticated,
+	ErrRaTokenExpired:       core.NpsAuthUnauthenticated,
+	ErrRaNidNotAllowed:      core.NpsAuthForbidden,
+	ErrRaPendingRejected:    core.NpsAuthForbidden,
+	ErrOcspStapleExpired:    core.NpsAuthUnauthenticated,
+	ErrOcspUnknown:          core.NpsAuthUnauthenticated,
+	ErrRevocationStateStale: core.NpsServerUnavailable,
 	// spec/error-codes.md:119 — NIP-CERT-NODE-ROLES-MISMATCH is NPS-CLIENT-BAD-FRAME.
 	ErrCertNodeRolesMismatch: core.NpsClientBadFrame,
 	// spec/error-codes.md:120 — ...while its Phase-3 sibling is NPS-AUTH-FORBIDDEN.

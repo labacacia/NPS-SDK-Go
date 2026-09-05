@@ -28,7 +28,9 @@ const (
 	ErrFederationLoop = "NDP-FEDERATION-LOOP"
 	ErrClusterSplit   = "NDP-CLUSTER-SPLIT"
 	// v0.9 heartbeat
-	ErrAnnounceStale = "NDP-ANNOUNCE-STALE"
+	ErrAnnounceStale    = "NDP-ANNOUNCE-STALE"
+	ErrStateUnavailable = "NDP-STATE-UNAVAILABLE"
+	ErrStateCorrupt     = "NDP-STATE-CORRUPT"
 )
 
 // NdpErrorToNpsStatus maps each NDP error code to its NPS status code.
@@ -53,4 +55,6 @@ var NdpErrorToNpsStatus = map[string]string{
 	ErrFederationLoop:           core.NpsClientConflict,
 	ErrClusterSplit:             core.NpsClientConflict,
 	ErrAnnounceStale:            core.NpsClientNotFound,
+	ErrStateUnavailable:         core.NpsServerUnavailable,
+	ErrStateCorrupt:             core.NpsServerInternal,
 }

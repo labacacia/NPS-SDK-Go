@@ -41,6 +41,9 @@ const (
 	ErrSpawnSpecInvalid   = "NOP-SPAWN-SPEC-INVALID"
 	ErrRuntimeIdleTimeout = "NOP-RUNTIME-IDLE-TIMEOUT"
 	ErrRuntimeMaxRuntime  = "NOP-RUNTIME-MAX-RUNTIME"
+	ErrReplayConflict     = "NOP-REPLAY-CONFLICT"
+	ErrReplayLimit        = "NOP-REPLAY-LIMIT"
+	ErrAggregationInvalid = "NOP-AGGREGATION-INVALID"
 )
 
 // NopErrorToNpsStatus maps each NOP error code to its NPS status code.
@@ -76,4 +79,7 @@ var NopErrorToNpsStatus = map[string]string{
 	ErrSpawnSpecInvalid:          core.NpsClientBadParam,
 	ErrRuntimeIdleTimeout:        core.NpsServerTimeout,
 	ErrRuntimeMaxRuntime:         core.NpsServerTimeout,
+	ErrReplayConflict:            core.NpsClientConflict,
+	ErrReplayLimit:               core.NpsLimitResource,
+	ErrAggregationInvalid:        core.NpsClientBadParam,
 }

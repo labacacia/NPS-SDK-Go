@@ -54,6 +54,8 @@ const (
 	ErrSubscribeFilterUnsupported = "NWP-SUBSCRIBE-FILTER-UNSUPPORTED"
 	ErrSubscribeInterrupted       = "NWP-SUBSCRIBE-INTERRUPTED"
 	ErrSubscribeSeqTooOld         = "NWP-SUBSCRIBE-SEQ-TOO-OLD"
+	ErrSubscribeLeaseInvalid      = "NWP-SUBSCRIBE-LEASE-INVALID"
+	ErrSubscribeLeaseExpired      = "NWP-SUBSCRIBE-LEASE-EXPIRED"
 
 	// Budget / rate errors
 	ErrBudgetExceeded    = "NWP-BUDGET-EXCEEDED"
@@ -151,6 +153,8 @@ var NwpErrorToNpsStatus = map[string]string{
 	ErrSubscribeFilterUnsupported:        core.NpsServerUnsupported,
 	ErrSubscribeInterrupted:              core.NpsServerUnavailable,
 	ErrSubscribeSeqTooOld:                core.NpsClientConflict,
+	ErrSubscribeLeaseInvalid:             core.NpsClientBadParam,
+	ErrSubscribeLeaseExpired:             core.NpsClientGone,
 	ErrBudgetExceeded:                    core.NpsLimitBudget,
 	ErrCgnLimitExceeded:                  core.NpsClientRequestTooLarge,
 	ErrDepthExceeded:                     core.NpsClientBadParam,
