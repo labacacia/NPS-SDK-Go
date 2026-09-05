@@ -11,6 +11,7 @@ anchor 缓存、类型化错误。
 
 ## 目录
 
+- [`Version`](#version)
 - [`FrameType`](#frametype)
 - [`EncodingTier`](#encodingtier)
 - [`FrameHeader`](#frameheader)
@@ -19,6 +20,17 @@ anchor 缓存、类型化错误。
 - [`FrameRegistry`](#frameregistry)
 - [`AnchorFrameCache`](#anchorframecache)
 - [错误类型](#错误类型)
+
+---
+
+## `Version`
+
+```go
+const Version = "1.0.0-alpha.18"
+```
+
+`Version` 是编译进 Go SDK 的套件版本。Release preparation 会将它和仓库
+`VERSION` 文件一并更新；若二者发生漂移，测试套件将失败。
 
 ---
 

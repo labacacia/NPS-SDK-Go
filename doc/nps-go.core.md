@@ -11,6 +11,7 @@ codec, anchor cache, typed errors.
 
 ## Table of contents
 
+- [`Version`](#version)
 - [`FrameType`](#frametype)
 - [`EncodingTier`](#encodingtier)
 - [`FrameHeader`](#frameheader)
@@ -19,6 +20,18 @@ codec, anchor cache, typed errors.
 - [`FrameRegistry`](#frameregistry)
 - [`AnchorFrameCache`](#anchorframecache)
 - [Error types](#error-types)
+
+---
+
+## `Version`
+
+```go
+const Version = "1.0.0-alpha.18"
+```
+
+`Version` is the suite version compiled into the Go SDK. Release preparation
+updates it together with the repository `VERSION` file, and the test suite
+fails if they diverge.
 
 ---
 
