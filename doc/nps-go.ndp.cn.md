@@ -2,7 +2,7 @@
 
 # `github.com/labacacia/NPS-sdk-go/ndp` — 参考
 
-> 规范：[NPS-4 NDP v0.8](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-4-NDP.md)
+> 规范：[NPS-4 NDP v0.8](https://github.com/labacacia/NPS/blob/main/spec/NPS-4-NDP.md)
 
 发现层 —— NPS 对应 DNS 的组件。三个帧、一个内存 TTL 注册表，以及
 签名校验器。
@@ -77,7 +77,7 @@ type GraphFrame struct {
 ```
 
 `Seq` 跳号触发重新同步请求，信号为 `NDP-GRAPH-SEQ-GAP`
-（见 [`error-codes.md`](https://github.com/labacacia/NPS-Release/blob/main/spec/error-codes.md)）。
+（见 [`error-codes.md`](https://github.com/labacacia/NPS/blob/main/spec/error-codes.md)）。
 
 ---
 

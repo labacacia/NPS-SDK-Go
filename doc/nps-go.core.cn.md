@@ -2,7 +2,7 @@
 
 # `github.com/labacacia/NPS-sdk-go/core` — 参考
 
-> 规范：[NPS-1 NCP v0.7](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-1-NCP.md)
+> 规范：[NPS-1 NCP v0.7](https://github.com/labacacia/NPS/blob/main/spec/NPS-1-NCP.md)
 
 基础包 —— 线路帧头、编码 tier、注册表校验的编解码器、
 anchor 缓存、类型化错误。

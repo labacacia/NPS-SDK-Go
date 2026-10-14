@@ -2,7 +2,7 @@
 
 # `github.com/labacacia/NPS-sdk-go/nwp` — 参考
 
-> 规范：[NPS-2 NWP v0.13](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-2-NWP.md)
+> 规范：[NPS-2 NWP v0.13](https://github.com/labacacia/NPS/blob/main/spec/NPS-2-NWP.md)
 
 面向 Agent 的 HTTP 层。两种帧类型 + 基于 `net/http` 的客户端。
 

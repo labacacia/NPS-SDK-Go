@@ -2,8 +2,10 @@ English | [中文版](./README.cn.md)
 
 # NPS Go SDK v1.0.0-alpha.19
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
-[![Release](https://img.shields.io/badge/release-v1.0.0--alpha.18-orange.svg)](../../CHANGELOG.md)
+> First time here? Start with [START-HERE.md](START-HERE.md) for architecture, security, and review guidance.
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/badge/release-v1.0.0--alpha.18-orange.svg)](CHANGELOG.md)
 [![NCP](https://img.shields.io/badge/NCP-v0.11-5b8cff.svg)]()
 [![NWP](https://img.shields.io/badge/NWP-v0.21-4af0b0.svg)]()
 [![NIP](https://img.shields.io/badge/NIP-v0.14-7b61ff.svg)]()
@@ -55,7 +57,7 @@ Alpha.15 additions: typed remote NIP CA client (`nip.NipCaClient`), native-mode 
   and CR-0007 runtime decisions.
 
 All five profiles consume the language-neutral fixtures under
-[`spec/conformance`](../../spec/conformance/).
+[`spec/conformance`](spec/conformance/).
 
 ## Installation
 

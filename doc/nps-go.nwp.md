@@ -2,7 +2,7 @@ English | [中文版](./nps-go.nwp.cn.md)
 
 # `github.com/labacacia/NPS-sdk-go/nwp` — Reference
 
-> Spec: [NPS-2 NWP v0.13](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-2-NWP.md)
+> Spec: [NPS-2 NWP v0.13](https://github.com/labacacia/NPS/blob/main/spec/NPS-2-NWP.md)
 
 Agent-facing HTTP layer. Two frame types + a `net/http`-based client.
 
