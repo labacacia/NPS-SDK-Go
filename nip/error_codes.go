@@ -86,13 +86,28 @@ const (
 )
 
 // NipErrorToNpsStatus maps each NIP error code to its NPS status code.
+const (
+	ErrContextInvalid             = "NIP-CONTEXT-INVALID"
+	ErrContextUntrusted           = "NIP-CONTEXT-UNTRUSTED"
+	ErrContextBindingMismatch     = "NIP-CONTEXT-BINDING-MISMATCH"
+	ErrContextExpired             = "NIP-CONTEXT-EXPIRED"
+	ErrContextReplay              = "NIP-CONTEXT-REPLAY"
+	ErrContextVerifierUnavailable = "NIP-CONTEXT-VERIFIER-UNAVAILABLE"
+)
+
 var NipErrorToNpsStatus = map[string]string{
-	ErrCertExpired:           core.NpsAuthUnauthenticated,
-	ErrCertRevoked:           core.NpsAuthUnauthenticated,
-	ErrCertSignatureInvalid:  core.NpsAuthUnauthenticated,
-	ErrCertUntrustedIssuer:   core.NpsAuthUnauthenticated,
-	ErrCertCapabilityMissing: core.NpsAuthForbidden,
-	ErrCertScopeViolation:    core.NpsAuthForbidden,
+	ErrContextInvalid:             "NPS-CLIENT-BAD-FRAME",
+	ErrContextUntrusted:           "NPS-AUTH-FORBIDDEN",
+	ErrContextBindingMismatch:     "NPS-AUTH-FORBIDDEN",
+	ErrContextExpired:             "NPS-AUTH-FORBIDDEN",
+	ErrContextReplay:              "NPS-CLIENT-CONFLICT",
+	ErrContextVerifierUnavailable: "NPS-SERVER-UNAVAILABLE",
+	ErrCertExpired:                core.NpsAuthUnauthenticated,
+	ErrCertRevoked:                core.NpsAuthUnauthenticated,
+	ErrCertSignatureInvalid:       core.NpsAuthUnauthenticated,
+	ErrCertUntrustedIssuer:        core.NpsAuthUnauthenticated,
+	ErrCertCapabilityMissing:      core.NpsAuthForbidden,
+	ErrCertScopeViolation:         core.NpsAuthForbidden,
 
 	ErrCaNidNotFound:          core.NpsClientNotFound,
 	ErrCaNidAlreadyExists:     core.NpsClientConflict,

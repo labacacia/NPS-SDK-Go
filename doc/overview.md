@@ -138,11 +138,11 @@ Non-2xx HTTP responses surface as `fmt.Errorf` with the pattern
 
 ## Spec links
 
-- [NPS-0 Overview](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-0-Overview.md)
-- [NPS-1 NCP](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-1-NCP.md)
-- [NPS-2 NWP](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-2-NWP.md)
-- [NPS-3 NIP](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-3-NIP.md)
-- [NPS-4 NDP](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-4-NDP.md)
-- [NPS-5 NOP](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-5-NOP.md)
-- [Frame registry](https://github.com/labacacia/NPS-Release/blob/main/spec/frame-registry.yaml)
-- [Error codes](https://github.com/labacacia/NPS-Release/blob/main/spec/error-codes.md)
+- [NPS-0 Overview](https://github.com/labacacia/NPS/blob/main/spec/NPS-0-Overview.md)
+- [NPS-1 NCP](https://github.com/labacacia/NPS/blob/main/spec/NPS-1-NCP.md)
+- [NPS-2 NWP](https://github.com/labacacia/NPS/blob/main/spec/NPS-2-NWP.md)
+- [NPS-3 NIP](https://github.com/labacacia/NPS/blob/main/spec/NPS-3-NIP.md)
+- [NPS-4 NDP](https://github.com/labacacia/NPS/blob/main/spec/NPS-4-NDP.md)
+- [NPS-5 NOP](https://github.com/labacacia/NPS/blob/main/spec/NPS-5-NOP.md)
+- [Frame registry](https://github.com/labacacia/NPS/blob/main/spec/frame-registry.yaml)
+- [Error codes](https://github.com/labacacia/NPS/blob/main/spec/error-codes.md)

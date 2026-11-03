@@ -2,7 +2,7 @@
 
 # `github.com/labacacia/NPS-sdk-go/nip` — 参考
 
-> 规范：[NPS-3 NIP v0.9](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-3-NIP.md)
+> 规范：[NPS-3 NIP v0.9](https://github.com/labacacia/NPS/blob/main/spec/NPS-3-NIP.md)
 
 身份层。三个帧 + 一个 Ed25519 辅助类，支持 AES-256-GCM 加密的磁盘
 持久化。

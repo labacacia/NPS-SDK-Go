@@ -1,9 +1,12 @@
 [English Version](./README.md) | 中文版
 
-# NPS Go SDK v1.0.0-alpha.19
+# NPS Go SDK v1.0.0-alpha.20
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../../LICENSE)
-[![Release](https://img.shields.io/badge/release-v1.0.0--alpha.18-orange.svg)](../../CHANGELOG.cn.md)
+> alpha.20 发布候选，尚未发布。六SDK辅助契约与实际运行路径分开；完整生产/跨SDK运行时一致性未获资格。
+
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/labacacia/NPS/blob/main/LICENSE)
+[![Release](https://img.shields.io/badge/candidate-v1.0.0--alpha.20-orange.svg)](../../CHANGELOG.cn.md)
 [![NCP](https://img.shields.io/badge/NCP-v0.11-5b8cff.svg)]()
 [![NWP](https://img.shields.io/badge/NWP-v0.21-4af0b0.svg)]()
 [![NIP](https://img.shields.io/badge/NIP-v0.14-7b61ff.svg)]()
@@ -18,9 +21,6 @@ Neural Protocol Suite (NPS) 的 Go 参考实现 —— 覆盖五个子协议：*
 | **Go** | 1.26.5+ |
 | **测试** | 完整测试与 Alpha.18 共享 fixture 通过 |
 | **许可证** | Apache 2.0 |
-
-规范仓库名与已发布 Go module 的大小写有意不同。已接受的 module path 决策见
-[命名与兼容性](docs/naming-and-compatibility.md)。
 
 Alpha.14 候选新增：远程 NIP CA 类型化客户端（`nip.NipCaClient`）、native-mode NWP 服务端 helper（`nwp.NwpNativeNodeServer`）和 TC-N1/TC-N2 一致性 manifest helper（`conformance`）。
 
@@ -52,7 +52,7 @@ Alpha.14 候选新增：远程 NIP CA 类型化客户端（`nip.NipCaClient`）�
 - NDP 0.12 签名 Announce 准入及 registry 冲突/liveness 策略。
 - NOP 0.9 确定性编排、callback 安全、委派、租约与 CR-0007 runtime 决策。
 
-五个 Profile 均消费 [`spec/conformance`](../../spec/conformance/) 下的语言无关 fixture。
+五个 Profile 均消费 [`spec/conformance`](https://github.com/labacacia/NPS/blob/prep/alpha20-release-candidate/spec/conformance/) 下的语言无关 fixture。
 
 ## 安装
 

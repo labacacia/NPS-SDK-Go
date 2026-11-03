@@ -2,7 +2,7 @@ English | [中文版](./nps-go.core.cn.md)
 
 # `github.com/labacacia/NPS-sdk-go/core` — Reference
 
-> Spec: [NPS-1 NCP v0.7](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-1-NCP.md)
+> Spec: [NPS-1 NCP v0.7](https://github.com/labacacia/NPS/blob/main/spec/NPS-1-NCP.md)
 
 Foundation package — wire header, encoding tiers, registry-validated
 codec, anchor cache, typed errors.

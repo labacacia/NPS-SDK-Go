@@ -8,13 +8,33 @@ Until NPS reaches v1.0 stable, every repository in the suite is synchronized to 
 
 ---
 
+## [1.0.0-alpha.20] — Release candidate, unpublished
+
+- Bounded experimental result resources/authorization, repeated-schema batches, local task handoff and volatile node transfer. Language support differs; full six-SDK runtime parity is not qualified.
+- Preserve measured comparisons with equivalent HTTPgzip and ordinary tools; no universal token, fee or speed benefit is claimed.
+- Align candidate versions and local CI/package verification. Full production, beta and actual publication remain separate gates.
+
+## [Unreleased]
+
+- Qualify CI/security with Go 1.26.10 and update the CA example builder; the Go 1.23 module language floor is unchanged and is not a security-patched runtime claim.
+
 ## [1.0.0-alpha.19] — 2026-09-05
 
 ### Added
 
+- Added the public `alpha19` policy package and executable coverage for all 47 shared NCP/NWP/NIP/NDP/NOP hardening vectors, including negative and non-fixture boundary paths.
 - Added the public compile-time `core.Version` runtime-inspection API, guarded
-  by a test and release gate that require it to match the repository `VERSION`
-  file.
+  by a test and release gate that require it to match the Go distribution
+  `VERSION` file.
+
+### Changed
+
+- Expanded Node L2 to v0.7/38 cases with current AaaS L2-01..L2-07; L2-01..05
+  are required and L2-06/07 `na` results require a reasoned message.
+- Aligned Node L2 manifests to v0.6 and all 31 cases; validation now enforces
+  summary integrity, whole-family applicability and the single-/multi-Anchor
+  HA invariant.
+- Registered the alpha.19 protocol errors and their canonical NPS status mappings.
 
 ## [1.0.0-alpha.18] — 2026-08-15
 

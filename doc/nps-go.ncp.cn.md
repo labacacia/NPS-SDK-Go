@@ -2,7 +2,7 @@
 
 # `github.com/labacacia/NPS-sdk-go/ncp` — 参考
 
-> 规范：[NPS-1 NCP v0.7](https://github.com/labacacia/NPS-Release/blob/main/spec/NPS-1-NCP.md)
+> 规范：[NPS-1 NCP v0.7](https://github.com/labacacia/NPS/blob/main/spec/NPS-1-NCP.md)
 
 五种 NCP 帧类型。每个 struct 都暴露同一组三件套：
 
@@ -125,7 +125,7 @@ type ErrorFrame struct {
 ```
 
 命名空间见
-[`error-codes.md`](https://github.com/labacacia/NPS-Release/blob/main/spec/error-codes.md)。
+[`error-codes.md`](https://github.com/labacacia/NPS/blob/main/spec/error-codes.md)。
 
 ---
 

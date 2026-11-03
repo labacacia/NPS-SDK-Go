@@ -47,7 +47,12 @@ const (
 )
 
 // NopErrorToNpsStatus maps each NOP error code to its NPS status code.
+const (
+	ErrExecutionIndeterminate = "NOP-EXECUTION-INDETERMINATE"
+)
+
 var NopErrorToNpsStatus = map[string]string{
+	ErrExecutionIndeterminate:    "NPS-SERVER-INTERNAL",
 	ErrTaskNotFound:              core.NpsClientNotFound,
 	ErrTaskTimeout:               core.NpsServerTimeout,
 	ErrTaskDagInvalid:            core.NpsClientBadFrame,
