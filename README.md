@@ -1,11 +1,13 @@
 English | [中文版](./README.cn.md)
 
-# NPS Go SDK v1.0.0-alpha.19
+# NPS Go SDK v1.0.0-alpha.20
 
-> First time here? Start with [START-HERE.md](START-HERE.md) for architecture, security, and review guidance.
+> alpha.20 candidate, unpublished. Six-SDK helper contracts and qualified runtime
+> paths differ; full production/cross-SDK runtime parity is not qualified.
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/badge/release-v1.0.0--alpha.18-orange.svg)](CHANGELOG.md)
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/labacacia/NPS/blob/main/LICENSE)
+[![Release](https://img.shields.io/badge/candidate-v1.0.0--alpha.20-orange.svg)](CHANGELOG.md)
 [![NCP](https://img.shields.io/badge/NCP-v0.11-5b8cff.svg)]()
 [![NWP](https://img.shields.io/badge/NWP-v0.21-4af0b0.svg)]()
 [![NIP](https://img.shields.io/badge/NIP-v0.14-7b61ff.svg)]()
@@ -20,10 +22,6 @@ Go reference implementation of the Neural Protocol Suite (NPS) — covers all fi
 | **Go** | 1.26.5+ |
 | **Tests** | Full suite and shared Alpha.18 fixtures passing |
 | **License** | Apache 2.0 |
-
-The canonical repository name and the published Go module intentionally use
-different casing. See [Naming and compatibility](docs/naming-and-compatibility.md)
-for the accepted module-path decision.
 
 Alpha.15 additions: typed remote NIP CA client (`nip.NipCaClient`), native-mode NWP serving helper (`nwp.NwpNativeNodeServer`), and TC-N1/TC-N2 conformance manifest helpers (`conformance`).
 
@@ -57,7 +55,7 @@ Alpha.15 additions: typed remote NIP CA client (`nip.NipCaClient`), native-mode 
   and CR-0007 runtime decisions.
 
 All five profiles consume the language-neutral fixtures under
-[`spec/conformance`](spec/conformance/).
+[`spec/conformance`](https://github.com/labacacia/NPS/blob/prep/alpha20-release-candidate/spec/conformance/).
 
 ## Installation
 

@@ -35,26 +35,33 @@ const (
 )
 
 // NcpErrorToNpsStatus maps each NCP error code to its NPS status code.
+const (
+	ErrFeatureNegotiationInvalid  = "NCP-FEATURE-NEGOTIATION-INVALID"
+	ErrFeatureRequiredUnsupported = "NCP-FEATURE-REQUIRED-UNSUPPORTED"
+)
+
 var NcpErrorToNpsStatus = map[string]string{
-	ErrAnchorNotFound:        core.NpsClientNotFound,
-	ErrAnchorSchemaInvalid:   core.NpsClientBadFrame,
-	ErrAnchorIdMismatch:      core.NpsClientConflict,
-	ErrFrameUnknownType:      core.NpsClientBadFrame,
-	ErrFramePayloadTooLarge:  core.NpsLimitPayload,
-	ErrFrameFlagsInvalid:     core.NpsClientBadFrame,
-	ErrStreamSeqGap:          core.NpsStreamSeqGap,
-	ErrStreamNotFound:        core.NpsStreamNotFound,
-	ErrStreamLimitExceeded:   core.NpsStreamLimit,
-	ErrEncodingUnsupported:   core.NpsServerEncodingUnsupported,
-	ErrAnchorStale:           core.NpsClientConflict,
-	ErrDiffFormatUnsupported: core.NpsClientBadFrame,
-	ErrVersionIncompatible:   core.NpsProtoVersionIncompatible,
-	ErrStreamWindowOverflow:  core.NpsStreamLimit,
-	ErrEncNotNegotiated:      core.NpsClientBadFrame,
-	ErrEncAuthFailed:         core.NpsClientBadFrame,
-	ErrPreambleInvalidCode:   core.NpsProtoPreambleInvalid,
-	ErrKeepaliveTimeout:      core.NpsServerTimeout,
-	ErrRekeyRequired:         core.NpsClientBadFrame,
-	ErrNidMismatch:           core.NpsAuthUnauthenticated,
-	ErrEarlyDataRejected:     core.NpsProtoVersionIncompatible,
+	ErrFeatureNegotiationInvalid:  "NPS-CLIENT-BAD-FRAME",
+	ErrFeatureRequiredUnsupported: "NPS-CLIENT-CONFLICT",
+	ErrAnchorNotFound:             core.NpsClientNotFound,
+	ErrAnchorSchemaInvalid:        core.NpsClientBadFrame,
+	ErrAnchorIdMismatch:           core.NpsClientConflict,
+	ErrFrameUnknownType:           core.NpsClientBadFrame,
+	ErrFramePayloadTooLarge:       core.NpsLimitPayload,
+	ErrFrameFlagsInvalid:          core.NpsClientBadFrame,
+	ErrStreamSeqGap:               core.NpsStreamSeqGap,
+	ErrStreamNotFound:             core.NpsStreamNotFound,
+	ErrStreamLimitExceeded:        core.NpsStreamLimit,
+	ErrEncodingUnsupported:        core.NpsServerEncodingUnsupported,
+	ErrAnchorStale:                core.NpsClientConflict,
+	ErrDiffFormatUnsupported:      core.NpsClientBadFrame,
+	ErrVersionIncompatible:        core.NpsProtoVersionIncompatible,
+	ErrStreamWindowOverflow:       core.NpsStreamLimit,
+	ErrEncNotNegotiated:           core.NpsClientBadFrame,
+	ErrEncAuthFailed:              core.NpsClientBadFrame,
+	ErrPreambleInvalidCode:        core.NpsProtoPreambleInvalid,
+	ErrKeepaliveTimeout:           core.NpsServerTimeout,
+	ErrRekeyRequired:              core.NpsClientBadFrame,
+	ErrNidMismatch:                core.NpsAuthUnauthenticated,
+	ErrEarlyDataRejected:          core.NpsProtoVersionIncompatible,
 }
