@@ -115,7 +115,26 @@ const (
 )
 
 // NwpErrorToNpsStatus maps each NWP error code to its NPS status code.
+const (
+	ErrChallengeInvalid           = "NWP-CHALLENGE-INVALID"
+	ErrChallengeNotFound          = "NWP-CHALLENGE-NOT-FOUND"
+	ErrChallengeBindingConflict   = "NWP-CHALLENGE-BINDING-CONFLICT"
+	ErrChallengeNotApproved       = "NWP-CHALLENGE-NOT-APPROVED"
+	ErrChallengeExpired           = "NWP-CHALLENGE-EXPIRED"
+	ErrChallengeStateUnavailable  = "NWP-CHALLENGE-STATE-UNAVAILABLE"
+	ErrFeatureRequirementsInvalid = "NWP-FEATURE-REQUIREMENTS-INVALID"
+	ErrFeatureRequiredUnsupported = "NWP-FEATURE-REQUIRED-UNSUPPORTED"
+)
+
 var NwpErrorToNpsStatus = map[string]string{
+	ErrChallengeInvalid:                  "NPS-CLIENT-BAD-FRAME",
+	ErrChallengeNotFound:                 "NPS-CLIENT-NOT-FOUND",
+	ErrChallengeBindingConflict:          "NPS-CLIENT-CONFLICT",
+	ErrChallengeNotApproved:              "NPS-CLIENT-CONFLICT",
+	ErrChallengeExpired:                  "NPS-CLIENT-CONFLICT",
+	ErrChallengeStateUnavailable:         "NPS-SERVER-UNAVAILABLE",
+	ErrFeatureRequirementsInvalid:        "NPS-CLIENT-BAD-FRAME",
+	ErrFeatureRequiredUnsupported:        "NPS-CLIENT-CONFLICT",
 	ErrAuthNidScopeViolation:             core.NpsAuthForbidden,
 	ErrAuthNidExpired:                    core.NpsAuthUnauthenticated,
 	ErrAuthNidRevoked:                    core.NpsAuthUnauthenticated,
